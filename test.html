@@ -1,0 +1,21 @@
+<html>
+<head>
+<script type="text/javascript" src="jquery-1.9.1.js"></script>
+<script type="text/javascript" src="kiara.js"></script>
+<script type="text/javascript">
+  function log(msg) {
+    $("#console").append("[" + new Date().toLocaleTimeString() + "] " + msg + "\n");
+    $("#console").scrollTop(9999999999);
+  }
+
+  function runTest() { 
+    var context = new KIARA.Context();
+    var conn = new KIARA.Connection(context, "http://yellow.cs.uni-saarland.de/home/kiara/login.idl");
+  }
+</script>
+</head>
+<body>
+  <button onclick="runTest()">Start test</button>
+  <pre id="console" style="background-color: black; color: white; height: 500px; overflow: auto"></pre>
+</body>
+</html>
