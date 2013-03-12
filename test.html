@@ -9,8 +9,23 @@
   }
 
   function runTest() { 
+    console.log("Creating context...");
     var context = new KIARA.Context();
-    var conn = new KIARA.Connection(context, "http://yellow.cs.uni-saarland.de/home/kiara/login.idl");
+    console.log("Context: ", context);
+    
+    console.log("Opening connection...");
+    var conn = new KIARA.Connection(context, "http://localhost/home/kiara/login.idl");
+    console.log("Connection: ", conn);
+    
+    console.log("Creating client func...");
+    var login = conn.GenerateClientFunc("opensim.login.login_to_simulator", "...");
+    console.log("Client func: ", login);
+    
+    // TODO(rryk): Fill in login requestion object for testing.
+    var loginRequest = { name: {first: "Sergiy", last: "Byelozyorov"} };
+    
+    console.log("Calling client func with request: ", loginRequest);
+    login(loginRequest).callback = function() { console.log("Received response for the client func: ", response); };
   }
 </script>
 </head>
