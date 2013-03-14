@@ -9,7 +9,7 @@
     console.log("Context: ", context);
     
     console.log("Opening connection...");
-    var conn = new KIARA.Connection(context, "http://localhost/home/kiara/login.idl");
+    var conn = new KIARA.Connection(context, "http://" + location.host + "/home/kiara/login.idl");
     console.log("Connection: ", conn);
     
     console.log("Creating client func...");
@@ -39,6 +39,7 @@
     var loginCall = login(loginRequest);
     loginCall.onreturn = function(ret) { console.log("Received return value for the client func: ", ret); };
     loginCall.onerror = function() { console.log("Failed to call client func."); }
+    console.log("Call object: ", loginCall);
   }
 </script>
 </head>

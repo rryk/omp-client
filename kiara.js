@@ -8,6 +8,7 @@ KIARA.WebSocketReconnectAttempts = 5;
 KIARA.ErrorCode = {
   INVALID_ARGUMENT: "Invalid argument",
   CANNOT_LOAD_IDL: "Cannot load IDL",
+  INVALID_TYPE_MAPPING: "Invalid type mapping",
   UNKNOWN_TYPE: "Unknown type",
   UNSUPPORTED_PROTOCOL: "Unsupported protocol",
   WEBSOCKET_ERROR: "WebSocket error"
@@ -178,10 +179,10 @@ KIARA.Connection.prototype._callWrapper = function(qualifiedMethodName, parsedMa
       return;
     var uidArray = new Uint32Array(serializedResult, 0, 1);
     if (uidArray[0] == uid) {
-      var returnValue = parsedMapping.deserializer(serializedResult);
+      var returnValue = parsedMapping.deserializer(serializedResult.slice(4));
       callbackContainer.onreturn(returnValue);
     }
-    connection.handlers.remove(handleData);
+    connection.dataHandlers.splice(connection.dataHandlers.indexOf(handleData), 1);
   }
   
   function handleError(socket, failedPacket) {
@@ -305,102 +306,80 @@ KIARA.Connection._getConnection = function(protocol, url, reconnectAttempt) {
   }
 }
 
-KIARA.Connection._getValue = function(argument, path) {
-  var value = argument;
-  for (var index in path)
-    value = value[path[index]];
-  return value;
-}
-
-KIARA.Connection._setValue = function(result, path, value) {
-  var cell = result;
-
-  // Construct necessary arrays/objects first.
-  for (var index = 0; index < path.length - 1; index++) {
-    var indexOrField = path[index];
-    if (cell[indexOrField] == undefined) {
-      if (typeof path[index+1] == "number")
-        cell[indexOrField] = [];
-      else if (typeof path[index+1] == "string")
-        cell[indexOrField] = {};
-      else
-        throw KIARA.ErrorCode.INVALID_ARGUMENT;
-    }
-    cell = cell[indexOrField];
-  }
-
-  cell[path[path.length-1]] = value;
-}
-
 // Returns an array of raw data entries (u8-32, i8-32) from args using serializeInfo. This can be directly written to 
 // the wire protocol.
 KIARA.Connection._getRawData = function(args, serializeInfo) {
   var rawData = [];
   for (var entryIndex in serializeInfo) {
-     var entry = serializeInfo[entryIndex];
-     var value = KIARA.Connection._getValue(args, entry.path);
-     switch (entry.type) {
-       case "zc-string":
-         for (var i = 0; i < value.length; i++)
-           rawData.push(["u16", value.charCodeAt(i)]);
-         rawData.push(["u16", 0]);
-         break;
-       case "array":
-         rawData.push(["u32", value.length]);
-         for (var i = 0; i < value.length; i++) {
-           var nestedData = KIARA.Connection._getRawData(value[i], entry.nested);
-           rawData = rawData.concat(nestedData);
-         }
-         break;
-       case "u8":
-       case "i8":
-       case "u16":
-       case "i16":
-       case "u32":
-       case "i32":
-         rawData.push([entry.type, value]);
-         break;
-       case "float":
-         rawData.push(["f32", value]);
-         break;
-       case "double":
-         rawData.push(["f64", value]);
-         break;
-       case "enum":
-         if (value in entry.enumDict)
-           rawData.push(["u32", entry.enumDict[value]]);
-         else
-           rawData.push(["u32", entry.enumDefault]);
-         break;
-       case "boolean":
-         rawData.push(["u8", value ? 1 : 0]);
-       default:
-         throw KIARA.ErrorCode.INVALID_ARGUMENT;
-     }
+    var entry = serializeInfo[entryIndex];
+
+    // Get field value.
+    var value = args;
+    for (var index in entry.path) {
+      if (value[entry.path[index]] != undefined)
+        value = value[entry.path[index]];
+      else
+        throw KIARA.ErrorCode.INVALID_ARGUMENT;
+    }
+
+    switch (entry.type) {
+      case "zc-string":
+        for (var i = 0; i < value.length; i++)
+          rawData.push(["u16", value.charCodeAt(i)]);
+        rawData.push(["u16", 0]);
+        break;
+      case "array":
+        rawData.push(["u32", value.length]);
+        for (var i = 0; i < value.length; i++) {
+          var nestedData = KIARA.Connection._getRawData(value[i], entry.nested);
+          rawData = rawData.concat(nestedData);
+        }
+        break;
+      case "u8":
+      case "i8":
+      case "u16":
+      case "i16":
+      case "u32":
+      case "i32":
+      case "float":
+      case "double":
+        rawData.push([entry.type, value]);
+        break;
+      case "enum":
+        if (value in entry.enumDict)
+          rawData.push(["u32", entry.enumDict[value]]);
+        else
+          rawData.push(["u32", entry.enumDefaultValue]);
+        break;
+      case "boolean":
+        rawData.push(["u8", value ? 1 : 0]);
+      default:
+        throw KIARA.ErrorCode.INVALID_TYPE_MAPPING;
+    }
   }
   return rawData;
+}
+
+// Private. Internal representation of the low-level wire types and their size on the wire.
+KIARA.Connection._typeMetaData = {
+  "u8": [Uint8Array, 1],
+  "i8": [Int8Array, 1],
+  "u16": [Uint16Array, 2],
+  "i16": [Int16Array, 2],
+  "u32": [Uint32Array, 4],
+  "i32": [Int32Array, 4],
+  "float": [Float32Array, 4],
+  "double": [Float64Array, 8],
 }
 
 // Private. Universal serializer that constructs request from args using serializeInfo (see _parseTypeMapping for 
 // details).
 KIARA.Connection._universalSerializer = function(args, serializeInfo) {
   var rawData = KIARA.Connection._getRawData(args, serializeInfo);
-  
-  var typeMetaData = {
-    "u8": [Uint8Array, 1],
-    "i8": [Int8Array, 1],
-    "u16": [Uint16Array, 2],
-    "i16": [Int16Array, 2],
-    "u32": [Uint32Array, 4],
-    "i32": [Int32Array, 4],
-    "f32": [Float32Array, 4],
-    "f64": [Float64Array, 8],
-  }
-
   var numBytes = 0;
   for (var i = 0; i < rawData.length; i++) {
     var typeName = rawData[i][0];
-    var typeSize = typeMetaData[typeName][1];
+    var typeSize = KIARA.Connection._typeMetaData[typeName][1];
     
     numBytes += typeSize;
   }
@@ -411,22 +390,138 @@ KIARA.Connection._universalSerializer = function(args, serializeInfo) {
     var typeName = rawData[i][0];
     var value = rawData[i][1];
     
-    var typeSize = typeMetaData[typeName][1];
-    var typedArrayType = typeMetaData[typeName][0];
-    var typedArray = new typedArrayType(buffer, offset, 1);
+    var typeByteSize = KIARA.Connection._typeMetaData[typeName][1];
+    var typedArrayType = KIARA.Connection._typeMetaData[typeName][0];
     
-    typedArray[0] = value;
+    // Set value of the typedArrayType to the offset. This workaround is necessary because typed array constructors
+    // require offset parameter to be multiple of the underlying type size. To resolve this, we create a new array
+    // containing just one element of necessary type, then create byte-array view into it and copy the value 
+    // byte-by-byte.
+    var typedArray = new typedArrayType(1);
+    typedArray[0] = value;    
+    var byteSrcArray = new Uint8Array(typedArray);
+    var byteDstArray = new Uint8Array(buffer, offset, typeByteSize);
+    byteDstArray.set(byteSrcArray);
     
-    offset += typeSize;
+    offset += typeByteSize;
   }
   
   return buffer;
 }
 
+KIARA.SerializedDataReader = function(serializedData) {
+  this.data = serializedData;
+  this.offset = 0;
+}
+
+KIARA.SerializedDataReader.prototype.read = function(entry) {
+  // Entry may be just a type name. Wrap this type name into an entry object.
+  if (typeof entry == "string")
+    entry = { type: entry };
+
+  switch (entry.type) {
+    case "zc-string":
+      var buffer = "";
+      var charCode = this.read("u16");
+      while (charCode != 0) {
+        buffer += String.fromCharCode(charCode);
+        charCode = this.read("u16");
+      }
+      return buffer;
+    case "u8":
+    case "i8":
+    case "u16":
+    case "i16":
+    case "u32":
+    case "i32":
+    case "float":
+    case "double":
+      var typedArrayType = KIARA.Connection._typeMetaData[entry.type][0];
+      var typeByteSize = KIARA.Connection._typeMetaData[entry.type][1];
+      var typedArray = new typedArrayType(this.data.slice(this.offset, typeByteSize + this.offset));
+      this.offset += typeByteSize;
+      return typedArray[0];
+    case "enum":
+      var intValue = this.read("u32");      
+      for (var key in entry.enumDict)
+        if (entry.enumDict[key] == intValue)
+          return key;
+      return entry.enumDefaultKey;
+    case "boolean":
+      return this.read("u8") == 1;
+    case "array":
+      var length = this.read("u32");
+      var array = [];
+      for (var index = 0; index < length; index++)
+        array.push(KIARA.Connection._universalDeserializer(this, entry.nested));
+      return array;
+    default:
+      throw KIARA.ErrorCode.INVALID_TYPE_MAPPING;
+  }
+}
+
+// Private. Given index or field name returns a container of an appopriate type (array or object respectively). If 
+// passed container is undefined, a new container is created, otherwise the existing container is checked to be of an
+// appropriate type. If so, it is returned unchanged, otherwise an exception KIARA.ErrorCode.INVALID_TYPE_MAPPING is 
+// thrown as it indicates inconsistency in the type mapping string.
+KIARA.Connection._ensureContainer = function(indexOrField, container) {
+  if (typeof indexOrField == "number") {
+    if (container == undefined)
+      return [];
+    else if (Object.prototype.toString.call(container) == "[object Array]")
+      return container;
+    else
+      throw KIARA.ErrorCode.INVALID_TYPE_MAPPING;
+  } else if (typeof indexOrField == "string") {
+    if (container == undefined)
+      return {};
+    else if (Object.prototype.toString.call(container) == "[object Object]")
+      return container;
+    else
+      throw KIARA.ErrorCode.INVALID_TYPE_MAPPING;
+  } else {
+    throw KIARA.ErrorCode.INVALID_TYPE_MAPPING;
+  }
+}
+
 // Private. Universal deserializer that constructs return value from the result using deserializeInfo (see 
 // _parseTypeMapping for details).
 KIARA.Connection._universalDeserializer = function(result, deserializeInfo) {
-  // TODO(rryk): Implement deserializer.
+  var retVal;
+  
+  // We may receive an existing reader as input (used for reading arrays). Then we must not re-create it.
+  var reader;
+  if (result instanceof KIARA.SerializedDataReader)
+    reader = result;
+  else
+    reader = new KIARA.SerializedDataReader(result);
+
+  for (var entryIndex in deserializeInfo) {
+    var entry = deserializeInfo[entryIndex];
+    if (entry.path.length == 0) {
+      if (retVal == undefined)
+        retVal = reader.read(entry);
+      else
+        throw KIARA.ErrorCode.INVALID_TYPE_MAPPING;
+      continue;
+    }
+    
+    // Construct root container.
+    retVal = KIARA.Connection._ensureContainer(entry.path[0], retVal);
+
+    // Construct nested containers.
+    var cell = retVal;
+    for (var index = 0; index < entry.path.length - 1; index++) {
+      var indexOrField = entry.path[index];
+      cell[indexOrField] = KIARA.Connection._ensureContainer(entry.path[index + 1], cell[indexOrField]);
+      cell = cell[indexOrField];
+    }
+    
+    // Read and store value.
+    cell[entry.path[entry.path.length - 1]] = reader.read(entry);
+  }
+
+  return retVal;
 }
 
 // Private. Parses type mapping string and return an object containing serializer for arguments and deserializer for
@@ -570,7 +665,8 @@ KIARA.Connection.prototype._parseTypeMapping = function(method, typeMapping) {
       {type: "i32", path: ["region_y"]},
       {type: "i32", path: ["region_x"]},
       {type: "zc-string", path: ["seed_capability"]},
-      {type: "enum", path: ["agent_access"], enumDict: {Mature: 0, Teen: 1}, enumDefault: 0},
+      {type: "enum", path: ["agent_access"], 
+       enumDict: {Mature: 0, Teen: 1}, enumDefaultValue: 0, enumDefaultKey: "Mature"},
       {type: "zc-string", path: ["session_id"]},
     ];
   } else if (method == "opensim.login.set_login_level") {
@@ -593,7 +689,7 @@ KIARA.Connection.prototype._parseTypeMapping = function(method, typeMapping) {
 // Private. Parses downloaded IDL and stores internal representation of it.
 KIARA.Connection.prototype._parseIDL = function(url, idl) {
   // Currently it's just a hack that uses dictionary for a set of known IDLs.
-  if (url == "http://localhost/home/kiara/login.idl") {
+  if (url == "http://" + location.host +  "/home/kiara/login.idl") {
     this._namespace = "opensim";
     this._addStructType("FullName", {
       first: "string", 
@@ -632,7 +728,7 @@ KIARA.Connection.prototype._parseIDL = function(url, idl) {
       agent_access: "AccessType",
       session_id: "string",
     });
-    this._addService("login", "WebSocket", "ws://localhost:8002/kiara/login", {
+    this._addService("login", "WebSocket", "ws://" + location.host + ":8002/kiara/login", {
       "login_to_simulator": [ "LoginResponse", { request: "LoginRequest" } ],
       "set_login_level": [ "boolean", { name: "FullName", password: "string", level: "i32" } ],
     });
