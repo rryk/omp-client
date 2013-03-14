@@ -1,19 +1,43 @@
 // KIARA namespace.
 var KIARA = KIARA || {};
 
+// Number of attempts a WebSocket connection will use to connect before failing.
+KIARA.WebSocketReconnectAttempts = 5;
+
 // Error codes thrown from the methods.
 KIARA.ErrorCode = {
   INVALID_ARGUMENT: "Invalid argument",
-  JQUERY_NOT_LOADED: "jQuery is not loaded",
   CANNOT_LOAD_IDL: "Cannot load IDL",
   UNKNOWN_TYPE: "Unknown type",
   UNSUPPORTED_PROTOCOL: "Unsupported protocol",
   WEBSOCKET_ERROR: "WebSocket error"
 }
 
+// Loads a script and fires callback, when it's loaded.
+KIARA.LoadScript = function(url, callback) {
+   // Find or create head element.
+   var head = document.getElementsByTagName('head')[0];
+   if (head == undefined) {
+     head = document.createElement('head');
+     document.body.parentElement.insertBefore(document.body, head);
+   }
+   
+   // Create script element.
+   var script = document.createElement('script');
+   script.type = 'text/javascript';
+   script.src = url;
+
+   // Bind the event to the callback function (there are several events for cross browser compatibility).
+   script.onreadystatechange = callback;
+   script.onload = callback;
+
+   // Fire the loading.
+   head.appendChild(script);
+}
+
 // Check for jQuery.
 if (typeof jQuery == "undefined")
-  throw KIARA.ErrorCode.JQUERY_NOT_LOADED;
+  LoadScript("jquery-1.9.1.js");
 
 // Add String.endsWith method.
 String.prototype.endsWith = function(suffix) {
@@ -59,6 +83,13 @@ KIARA.DataType.GetArrayElementType = function(typeName) {
 // Represents execution context. Operations in each context are completely indepedent from each other.
 KIARA.Context = function() {
   this._dataTypes = {};
+}
+
+// Generates unique identifiers.
+KIARA.Context.GenerateUID = function() {
+  if (KIARA.Context._nextUID == undefined)
+    KIARA.Context._nextUID = 0;
+  return KIARA.Context._nextUID++;
 }
 
 // Returns a named type.
@@ -112,44 +143,166 @@ KIARA.Connection = function(context, url) {
   });
 }
 
-// Constructs a client function that will automatically serialize all arguments and send them over network. The function
-// will return an empty object, which can be used to set up a callback by assigining it to the callback field:
+// Constructs a client function that will automatically serialize the method call and send it to the server. The 
+// function will return an empty object, which can be used to set up a callback when response is received:
+//
 //   var login = conn.GenerateClientFunc(...);
-//   login().callback = function(response) { ... };
-// Callback will be called with return value of the function.
-KIARA.Connection.prototype.GenerateClientFunc = function(method, typeMapping) {
-  var parsedMapping = this._parseTypeMapping(method, typeMapping);
+//   login(args).onreturn = function(returnValue) { /* process return value here */ };
+//
+// Callback will be called with one argument that corresponds to the return value of the function in IDL.
+KIARA.Connection.prototype.GenerateClientFunc = function(qualifiedMethodName, typeMapping) {
+  var parsedMapping = this._parseTypeMapping(qualifiedMethodName, typeMapping);
   var that = this;
-  return function() {
-    var serializedData = parsedMapping.serializer(arguments);
-    var connection = that._getConnection(method);
-    var callbackContainer = {};
-    connection.send(serializedData);
-    connection.ondata = function(serializedData) {
-      if (callbackContainer.callback != undefined)
-        callbackContainer.callback(parsedMapping.deserializer(serializedData));
-      delete connection.ondata;
-    }
-    return callbackContainer;
-  }
+  return function() { return that._callWrapper(qualifiedMethodName, parsedMapping, arguments); }
 }
 
-KIARA.Connection._getConnection = function(qualifiedMethodName) {
-  var localMethodName = qualifiedMethodName.substr(this._namespace.length);
+KIARA.Connection.prototype._callWrapper = function(qualifiedMethodName, parsedMapping, args) {
+  // Get connection to the service.
+  var localMethodName = qualifiedMethodName.substr(this._namespace.length + 1);
   var serviceName = localMethodName.substr(0, localMethodName.indexOf("."));
-  var methodName = localMethodName.substr(localMethodName.indexOf("."));
   var service = this._services[serviceName];
-  var method = service.methods[methodName];
+  if (service == undefined)
+    return KIARA.ErrorCode.INVALID_ARGUMENT;
+  var connection = KIARA.Connection._getConnection(service.protocol, service.url);
   
-  if (method.connection == undefined) {
-     if (service.protocol != "WebSocket")
-       throw KIARA.ErrorCode.UNSUPPORTED_PROTOCOL;
-     method.connection = new WebSocket(service.baseURL + methodName);
-     method.connection.onerror = function() { throw KIARA.ErrorCode.WEBSOCKET_ERROR; }
-     method.connection.onclose = function() { delete method.connection; }  // will trigger reconnect at next call
+  // Serialize method call.
+  var serializedArgs = parsedMapping.serializer(args);
+  var uid = KIARA.Context.GenerateUID();
+  var serializedMethodCall = KIARA.Connection._serializeMethodCall(uid, qualifiedMethodName, serializedArgs);
+  
+  // Prepare response handler.
+  var callbackContainer = {};
+  
+  function handleData(socket, serializedResult) {
+    if (callbackContainer.onreturn == undefined)
+      return;
+    var uidArray = new Uint32Array(serializedResult, 0, 1);
+    if (uidArray[0] == uid) {
+      var returnValue = parsedMapping.deserializer(serializedResult);
+      callbackContainer.onreturn(returnValue);
+    }
+    connection.handlers.remove(handleData);
   }
   
-  return method.connection;
+  function handleError(socket, failedPacket) {
+    var uidArray = new Uint32Array(failedPacket, 0, 1);
+    if (uidArray[0] == uid) {
+      if (callbackContainer.onerror == undefined)
+        throw KIARA.ErrorCode.WEBSOCKET_ERROR;
+      else
+        callbackContainer.onerror();
+    }
+  }
+  
+  connection.dataHandlers.push(handleData);
+  connection.errorHandlers.push(handleError);
+  
+  // Send data.
+  connection.send(serializedMethodCall);
+  
+  return callbackContainer;
+}
+
+KIARA.Connection._serializeMethodCall = function(uid, methodName, serializedArgs) {
+  // Allocate memory.
+  var serializedMethodCall = new ArrayBuffer(
+    4 +                          // Unique ID.
+    methodName.length * 2 + 2 +  // Method name and trailing 0.
+    serializedArgs.byteLength);  // Args.
+  
+  // Store unique ID.
+  var uidArray = new Uint32Array(serializedMethodCall, 0, 1);
+  uidArray[0] = uid;
+  
+  // Store method name.
+  var methodNameArray = new Uint16Array(serializedMethodCall, 4, methodName.length + 1);
+  for (var i = 0; i < methodName.length; i++)
+    methodNameArray[i] = methodName.charCodeAt(i);
+  methodNameArray[methodName.length] = 0;
+  
+  // Copy serialized args.
+  var srcArray = new Uint8Array(serializedArgs);
+  var dstArray = new Uint8Array(serializedMethodCall, 4 + methodName.length * 2 + 2, srcArray.length);
+  dstArray.set(srcArray);
+  
+  return serializedMethodCall;
+}
+
+KIARA.Connection._getConnection = function(protocol, url, reconnectAttempt) {
+  if (protocol == "WebSocket") {
+    if (KIARA.Connection._webSocketCache == undefined)
+      KIARA.Connection._webSocketCache = {};
+         
+    if (KIARA.Connection._webSocketCache[url] == undefined) {
+      var socket = new WebSocket(url);
+      socket.dataHandlers = [];
+      socket.errorHandlers = [];
+      socket.bufferedPackets = [];
+      socket.binaryType = "arraybuffer";
+      
+      socket.onerror = socket.onclose = function() {
+        // Delete connection from the cache.
+        delete KIARA.Connection._webSocketCache[url];
+        
+        // If there are any buffered messages - try to reconnect.
+        if (socket.bufferedPackets.length > 0) {
+          // Initialize reconnect attempt if neccessary.
+          if (reconnectAttempt == undefined)
+            reconnectAttempt = 1;
+            
+          if (reconnectAttempt > KIARA.WebSocketReconnectAttempts) {
+            // Execute error handlers if this is the last reconnect attempt.
+            if (socket.bufferedPackets.length > 0) {
+              for (var handlerIndex in socket.errorHandlers) {
+                var handler = socket.errorHandlers[handlerIndex];
+                for (var packetIndex in socket.bufferedPackets) {
+                  var packet = socket.bufferedPackets[packetIndex];
+                  handler(socket, packet);
+                }
+              }
+            }
+          } else {
+            // Otherwise, retry connection.
+            reconnectAttempt++;
+        
+            var connection = KIARA.Connection._getConnection(protocol, url, reconnectAttempt);
+            connection.dataHandlers = socket.dataHandlers;
+            connection.errorHandlers = socket.errorHandlers;
+            connection.bufferedPackets = socket.bufferedPackets;
+          }
+        }
+      };
+      
+      socket.onopen = function(event) {
+        // Send buffered packets.
+        var packet;
+        while (packet = socket.bufferedPackets.shift())
+          socket.oldSend(packet);
+      }
+      
+      socket.onmessage = function(event) {
+        // Execute data handlers.
+        for (var handlerIndex in socket.dataHandlers) {
+          var handler = socket.dataHandlers[handlerIndex];
+          handler(socket, event.data);
+        }
+      }
+      
+      socket.oldSend = socket.send;
+      socket.send = function(packet) {
+        if (socket.readyState == socket.OPEN)
+          socket.oldSend(packet);
+        else
+          socket.bufferedPackets.push(packet);
+      }
+      
+      KIARA.Connection._webSocketCache[url] = socket;
+    }
+    
+    return KIARA.Connection._webSocketCache[url];
+  } else {
+    throw KIARA.ErrorCode.UNSUPPORTED_PROTOCOL;
+  }
 }
 
 KIARA.Connection._getValue = function(argument, path) {
@@ -179,22 +332,23 @@ KIARA.Connection._setValue = function(result, path, value) {
   cell[path[path.length-1]] = value;
 }
 
-KIARA.Connection._getRawData = function(arguments, serializeInfo) {
+// Returns an array of raw data entries (u8-32, i8-32) from args using serializeInfo. This can be directly written to 
+// the wire protocol.
+KIARA.Connection._getRawData = function(args, serializeInfo) {
   var rawData = [];
   for (var entryIndex in serializeInfo) {
      var entry = serializeInfo[entryIndex];
+     var value = KIARA.Connection._getValue(args, entry.path);
      switch (entry.type) {
        case "zc-string":
-   var str = KIARA.Connection._getValue(arguments, entry.path);
-         for (var i = 0; i < str.length; i++)
-           rawData.push(["u16", str.charCodeAt(i)]);
+         for (var i = 0; i < value.length; i++)
+           rawData.push(["u16", value.charCodeAt(i)]);
          rawData.push(["u16", 0]);
          break;
        case "array":
-         var array = KIARA.Connection._getValue(entry.path);
-         rawData.push(["u32", array.length]);
-         for (var i = 0; i < array.length; i++) {
-           var nestedData = KIARA.Connection._getRawData(array[i], entry.nested);
+         rawData.push(["u32", value.length]);
+         for (var i = 0; i < value.length; i++) {
+           var nestedData = KIARA.Connection._getRawData(value[i], entry.nested);
            rawData = rawData.concat(nestedData);
          }
          break;
@@ -204,24 +358,22 @@ KIARA.Connection._getRawData = function(arguments, serializeInfo) {
        case "i16":
        case "u32":
        case "i32":
-         var value = KIARA.Connection._getValue(arguments, entry.path);
          rawData.push([entry.type, value]);
          break;
        case "float":
-         var value = KIARA.Connection._getValue(arguments, entry.path);
          rawData.push(["f32", value]);
          break;
        case "double":
-         var value = KIARA.Connection._getValue(arguments, entry.path);
          rawData.push(["f64", value]);
          break;
        case "enum":
-         var value = KIARA.Connection._getValue(arguments, entry.path);
          if (value in entry.enumDict)
            rawData.push(["u32", entry.enumDict[value]]);
          else
            rawData.push(["u32", entry.enumDefault]);
          break;
+       case "boolean":
+         rawData.push(["u8", value ? 1 : 0]);
        default:
          throw KIARA.ErrorCode.INVALID_ARGUMENT;
      }
@@ -229,8 +381,10 @@ KIARA.Connection._getRawData = function(arguments, serializeInfo) {
   return rawData;
 }
 
-KIARA.Connection._universalSerializer = function(arguments, info) {
-  var rawData = KIARA.Connection._getRawData(arguments, info);
+// Private. Universal serializer that constructs request from args using serializeInfo (see _parseTypeMapping for 
+// details).
+KIARA.Connection._universalSerializer = function(args, serializeInfo) {
+  var rawData = KIARA.Connection._getRawData(args, serializeInfo);
   
   var typeMetaData = {
     "u8": [Uint8Array, 1],
@@ -269,7 +423,9 @@ KIARA.Connection._universalSerializer = function(arguments, info) {
   return buffer;
 }
 
-KIARA.Connection._universalDeserializer = function(result) {
+// Private. Universal deserializer that constructs return value from the result using deserializeInfo (see 
+// _parseTypeMapping for details).
+KIARA.Connection._universalDeserializer = function(result, deserializeInfo) {
   // TODO(rryk): Implement deserializer.
 }
 
@@ -300,6 +456,7 @@ KIARA.Connection.prototype._parseTypeMapping = function(method, typeMapping) {
   //   u8-32, i8-32  - integers are coded using [Uint|Int][8|16|32]Array, values outside of valid range will overflow.
   //   float, double - reals are coded using Float[32|64]Array, values outside of valid range will overflow.
   //   enum          - enums values are coded as integers using Uint32Array.
+  //   boolean       - coded using Uint8Array.
   //
   // For example, the following arguments
   //
@@ -379,16 +536,57 @@ KIARA.Connection.prototype._parseTypeMapping = function(method, typeMapping) {
   var resultDeserializeInfo;
 
   // Currently it's just a hack that has pre-coded functions for each method.
-  // TODO(rryk): Hard-code type mapping info for login_to_simulator and set_login_level
   if (method == "opensim.login.login_to_simulator") {
-    
+    argsSerializeInfo = [
+      {type: "zc-string", path: [0, "name", "first"]},
+      {type: "zc-string", path: [0, "name", "last"]},
+      {type: "zc-string", path: [0, "pwdHash"]},
+      {type: "zc-string", path: [0, "start"]},
+      {type: "zc-string", path: [0, "channel"]},
+      {type: "zc-string", path: [0, "version"]},
+      {type: "zc-string", path: [0, "platform"]},
+      {type: "zc-string", path: [0, "mac"]},
+      {type: "array", path: [0, "options"], nested: [
+        {type: "zc-string", path: []},
+      ]},
+      {type: "zc-string", path: [0, "id0"]},
+      {type: "zc-string", path: [0, "agree_to_tos"]},
+      {type: "zc-string", path: [0, "read_critical"]},
+      {type: "zc-string", path: [0, "viewer_digest"]},
+    ];
+    resultDeserializeInfo = [
+      {type: "zc-string", path: ["name", "first"]},
+      {type: "zc-string", path: ["name", "last"]},
+      {type: "u32", path: ["sim_ip"]},
+      {type: "zc-string", path: ["start_location"]},
+      {type: "u32", path: ["seconds_since_epoch"]},
+      {type: "zc-string", path: ["message"]},
+      {type: "u32", path: ["circuit_code"]},
+      {type: "u16", path: ["sim_port"]},
+      {type: "zc-string", path: ["secure_session_id"]},
+      {type: "zc-string", path: ["look_at"]},
+      {type: "zc-string", path: ["agent_id"]},
+      {type: "zc-string", path: ["inventory_host"]},
+      {type: "i32", path: ["region_y"]},
+      {type: "i32", path: ["region_x"]},
+      {type: "zc-string", path: ["seed_capability"]},
+      {type: "enum", path: ["agent_access"], enumDict: {Mature: 0, Teen: 1}, enumDefault: 0},
+      {type: "zc-string", path: ["session_id"]},
+    ];
   } else if (method == "opensim.login.set_login_level") {
-  
+    argsSerializeInfo = [
+      {type: "zc-string", path: [0, "first"]},
+      {type: "zc-string", path: [0, "last"]},
+      {type: "zc-string", path: [1]},
+    ];
+    resultDeserializeInfo = [
+      {type: "boolean", path: []}
+    ];
   }
 
   return {
-    serializer: function() { KIARA.Connection._universalSerializer(arguments, argsSerializeInfo); },
-    deserializer: function() { KIARA.Connection._universalDeserializer(arguments, argsSerializeInfo); },
+    serializer: function(args) { return KIARA.Connection._universalSerializer(args, argsSerializeInfo); },
+    deserializer: function(result) { return KIARA.Connection._universalDeserializer(result, resultDeserializeInfo); },
   };
 }
 
@@ -434,9 +632,9 @@ KIARA.Connection.prototype._parseIDL = function(url, idl) {
       agent_access: "AccessType",
       session_id: "string",
     });
-    this._addService("login", "WebSocket", "ws://yellow.cs.uni-saarland.de:8002/", {
-      "login_to_simulator": [ "LoginResponse", [ "LoginRequest" ] ],
-      "set_login_level": [ "boolean", [ "FullName", "string" ] ],
+    this._addService("login", "WebSocket", "ws://localhost:8002/kiara/login", {
+      "login_to_simulator": [ "LoginResponse", { request: "LoginRequest" } ],
+      "set_login_level": [ "boolean", { name: "FullName", password: "string", level: "i32" } ],
     });
   }
 }
@@ -482,20 +680,20 @@ KIARA.Connection.prototype._addEnumType = function(name, def) {
 }
 
 // Private. Adds a service. Prepends namespaces where necessary.
-KIARA.Connection.prototype._addService = function(name, protocol, baseURL, methods) {
+KIARA.Connection.prototype._addService = function(name, protocol, url, methods) {
   var newMethods = {};
   for (var methodName in methods) {
     var methodDef = methods[methodName];
     newMethods[methodName] = {};
     newMethods[methodName].response = this._prependNamespaceIfNeeded(methodDef[0]);
     newMethods[methodName].request = [];
-    for (var argIndex in methodDef[1])
-      newMethods[methodName].request[argIndex] = this._prependNamespaceIfNeeded(methodDef[1][argIndex]);
+    for (var argName in methodDef[1])
+      newMethods[methodName].request[argName] = this._prependNamespaceIfNeeded(methodDef[1][argName]);
   }
 
   this._services[name] = {
     methods: newMethods,
     protocol: protocol,
-    baseURL: baseURL
+    url: url
   };
 }

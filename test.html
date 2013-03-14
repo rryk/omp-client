@@ -3,11 +3,6 @@
 <script type="text/javascript" src="jquery-1.9.1.js"></script>
 <script type="text/javascript" src="kiara.js"></script>
 <script type="text/javascript">
-  function log(msg) {
-    $("#console").append("[" + new Date().toLocaleTimeString() + "] " + msg + "\n");
-    $("#console").scrollTop(9999999999);
-  }
-
   function runTest() { 
     console.log("Creating context...");
     var context = new KIARA.Context();
@@ -18,19 +13,36 @@
     console.log("Connection: ", conn);
     
     console.log("Creating client func...");
-    var login = conn.GenerateClientFunc("opensim.login.login_to_simulator", "...");
+    var login = conn.GenerateClientFunc("opensim.login.login_to_simulator", 
+                                        "Request.request : Args[0]; Response : Result;");
     console.log("Client func: ", login);
     
-    // TODO(rryk): Fill in login requestion object for testing.
-    var loginRequest = { name: {first: "Sergiy", last: "Byelozyorov"} };
+    var loginRequest = { 
+      name: {
+        first: "Sergiy", 
+        last: "Byelozyorov"
+      },
+      pwdHash: "$1$de736bf2ae0961ec58ed7b29fc78edf2",
+      start: "last",
+      channel: "OpenSIM OMP JS Client",
+      version: "0.1",
+      platform: "Lin",
+      mac: "00:00:00:00:00:00",  // FIXME(rryk): We can't get MAC address from the JavaScript.
+      options: ["inventory-skeleton", "inventory-root"],
+      id0: "00000000-0000-0000-0000-000000000000",  // FIXME(rryk): Not sure how to compute hardware hash.
+      agree_to_tos: "true",
+      read_critical: "true",
+      viewer_digest: "00000000-0000-0000-0000-000000000000"
+    };
     
     console.log("Calling client func with request: ", loginRequest);
-    login(loginRequest).callback = function() { console.log("Received response for the client func: ", response); };
+    var loginCall = login(loginRequest);
+    loginCall.onreturn = function(ret) { console.log("Received return value for the client func: ", ret); };
+    loginCall.onerror = function() { console.log("Failed to call client func."); }
   }
 </script>
 </head>
 <body>
   <button onclick="runTest()">Start test</button>
-  <pre id="console" style="background-color: black; color: white; height: 500px; overflow: auto"></pre>
 </body>
 </html>
