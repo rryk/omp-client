@@ -398,7 +398,7 @@ KIARA.Connection._universalSerializer = function(args, serializeInfo) {
     // containing just one element of necessary type, then create byte-array view into it and copy the value 
     // byte-by-byte.
     var typedArray = new typedArrayType(1);
-    typedArray[0] = value;    
+    typedArray[0] = value;
     var byteSrcArray = new Uint8Array(typedArray);
     var byteDstArray = new Uint8Array(buffer, offset, typeByteSize);
     byteDstArray.set(byteSrcArray);
@@ -652,7 +652,8 @@ KIARA.Connection.prototype._parseTypeMapping = function(method, typeMapping) {
     resultDeserializeInfo = [
       {type: "zc-string", path: ["name", "first"]},
       {type: "zc-string", path: ["name", "last"]},
-      {type: "u32", path: ["sim_ip"]},
+      {type: "zc-string", path: ["login"]},
+      {type: "zc-string", path: ["sim_ip"]},
       {type: "zc-string", path: ["start_location"]},
       {type: "u32", path: ["seconds_since_epoch"]},
       {type: "zc-string", path: ["message"]},
@@ -693,7 +694,7 @@ KIARA.Connection.prototype._parseIDL = function(url, idl) {
     this._namespace = "opensim";
     this._addStructType("FullName", {
       first: "string", 
-      last: "string"
+      last: "string",
     });
     this._addStructType("LoginRequest", {
       name: "FullName",
@@ -707,12 +708,13 @@ KIARA.Connection.prototype._parseIDL = function(url, idl) {
       id0: "string",
       agree_to_pos: "string",
       read_critical: "string",
-      viewer_digest: "string"
+      viewer_digest: "string",
     });
     this._addEnumType("AccessType", {Mature: 0, Teen: 1});
     this._addStructType("LoginResponse", {
       name: "FullName",
-      sim_ip: "u32",
+      login: "string",
+      sim_ip: "string",
       start_location: "string",
       seconds_since_epoch: "u64",
       message: "string",
@@ -728,7 +730,7 @@ KIARA.Connection.prototype._parseIDL = function(url, idl) {
       agent_access: "AccessType",
       session_id: "string",
     });
-    this._addService("login", "WebSocket", "ws://" + location.host + ":8002/kiara/login", {
+    this._addService("login", "WebSocket", "ws://" + location.host + ":9000/kiara/login", {
       "login_to_simulator": [ "LoginResponse", { request: "LoginRequest" } ],
       "set_login_level": [ "boolean", { name: "FullName", password: "string", level: "i32" } ],
     });
