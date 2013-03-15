@@ -31,7 +31,7 @@ struct LoginResponse {
   FullName name;
   u32 sim_ip;                // IP address used to establish UDP connection with startup simulator.
   string start_location;     // Result of 'start' parameter as specified in input parameters.
-  u64 seconds_since_epoch;   // ???
+  u64 seconds_since_epoch;   // Time on the server in seconds since 01.01.1970 00:00.
   string message;            // Message of the day from login.
   u32 circuit_code;          // Used to validate UDP connection with login simulator.
   u16 sim_port;              // Port used to establish UDP connection with login simulator.
@@ -41,12 +41,12 @@ struct LoginResponse {
   string inventory_host;     // Name of database used for inventory.
   i32 region_y;              // The 'y' grid coordinate of the region.
   i32 region_x;              // The 'x' grid coordinate of the region.
-  string seed_capability;    // ???
+  string seed_capability;    // URL for the seed capability (used to obtain other capabilities).
   AccessType agent_access;   // Authorization information about access to main/mature grid as opposed to teen grid.
   string session_id;         // UUID for current session with simulator. Used in UDP message passing.
 }
 
-[WebSocket("http://yellow.cs.uni-saarland.de:8002/kiara/login")]
+[WebSocket("http://yellow.cs.uni-saarland.de:9000/kiara/login")]
 service login {
   LoginResponse login_to_simulator(LoginRequest request);
   boolean set_login_level(FullName name, string password, i32 level);
