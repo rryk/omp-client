@@ -397,6 +397,7 @@ KIARA.Connection._universalSerializer = function(args, serializeInfo) {
     // require offset parameter to be multiple of the underlying type size. To resolve this, we create a new array
     // containing just one element of necessary type, then create byte-array view into it and copy the value 
     // byte-by-byte.
+    // FIXME(rryk): We can use DataView class instead. It will not require the workaround.
     var typedArray = new typedArrayType(1);
     typedArray[0] = value;
     var byteSrcArray = new Uint8Array(typedArray);
