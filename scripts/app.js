@@ -30,6 +30,8 @@ requirejs(['omp/omp'],
 function(OMP) {
     var client = new OMP.Client();
     client.login('Test', 'User', '123', function() {
-        client.connect();
+        client.connect(function() {
+            logger.info("Connected!");
+        });
     })
 });

@@ -1249,15 +1249,13 @@
         this._connection = connection;
         this._methodDescriptor = methodDescriptor;
         this._result = null;
-        this._resultType = null; // 'result', 'exception', or 'error'
+        this._resultType = null; // 'result' or 'error'
         augmentWithListener(this);
         var options = options || { };
         if (options.onerror)
             this.addListener('error', options.onerror);
         if (options.onresult)
             this.addListener('result', options.onresult);
-        if (options.onexception)
-            this.addListener('exception', options.onexception);
     }
 
     CallResponse.prototype.getMethodName = function() {
@@ -1269,7 +1267,7 @@
     }
 
     CallResponse.prototype.setResult = function(result, resultType) {
-        if (resultType != 'result' && resultType != 'exception' && resultType != 'error')
+        if (resultType != 'result' && resultType != 'error')
             throw new KIARAError(KIARA.INVALID_ARGUMENT, "Unsupported result type: "+resultType);
         this._result = result;
         this._resultType = resultType;
@@ -1277,7 +1275,7 @@
     }
 
     CallResponse.prototype._listenerAdded = function(name, handler) {
-        if (this._error || this._result || this._exception)
+        if (this._error || this._result)
             this._handleResult();
     }
 
@@ -1375,11 +1373,9 @@
     // options argument is optional and can contain callback mappings:
     // result : function (result, exception) { ... }
     // error : function (error) { ... }
-    // exception : function (exception) { ... }
     //
     // result is invoked when either result or exception returned from the remote side
     // error is invoked when call failed
-    // exception is invoked when exception is returned from the remote side
     // when both result and exception callbacks are defined, result is not called on
     // remote exception.
     Connection.prototype.generateFuncWrapper = function(qualifiedMethodName, typeMapping, options) {
@@ -1426,6 +1422,13 @@
         this._idls[url] = response;
         // TODO parse IDL, open connection specified in the IDL
 
+        // FIXME(rryk):This is a hack. We should maintain multiple low-level connections if IDLs contain different URLs.
+        // Then on the call to a function we would need to determine which service it belongs to and use appropriate
+        // connection to send/receive data. Since there is no IDL parsing at the moment - we simply return when the
+        // connection was already provided by the IDL specified in the constructor.
+        if (this._protocol)
+          return;
+
         //???BEGIN PROTOCOL SPECIFIC PART
         //var protocolName = 'jsonrpc';
         //var protocolUrl = 'http://' + location.hostname + ':8080/rpc/calc';
@@ -1441,13 +1444,12 @@
                 break;
             case "interface.kiara":
                 protocolName = 'websocket-json';
-                protocolUrl = 'ws://' + location.hostname + ':9000/region/interface';
+                protocolUrl = 'ws://' + location.hostname + ':9000/region';
                 break;
             default:
                 handleError(new KIARAError(KIARA.UNSUPPORTED_FEATURE, "IDL " + url + " is not hard-coded."));
                 break;
         }
-
         //???END PROTOCOL SPECIFIC PART
 
         var protocolCtor = getProtocol(protocolName);

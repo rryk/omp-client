@@ -24,7 +24,7 @@
         var self = this;
 
         var context = self.context = KIARA.createContext();
-        self.loginConnection = context.openConnection("http://" + location.host + "/home/kiara/idl/login.kiara",
+        self.loginConnection = context.openConnection("http://yellow.cg.uni-saarland.de/home/kiara/idl/login.kiara",
             function (err, conn) {
                 if (err) {
                     logger.error(err);
@@ -68,23 +68,25 @@
         );
     }
 
-    OMP.Client.prototype.connect = function() {
+    OMP.Client.prototype.connect = function(callback) {
         var self = this;
         if (!self.loginResponse)
             throw new KIARA.Error(KIARA.API_ERROR, "Login response missing to connect. Please login first.");
 
         var connection = self.regionConnection = self.context.openConnection(
-            "http://" + location.host + "/home/kiara/idl/interface.kiara",
+            "http://yellow.cg.uni-saarland.de/home/kiara/idl/interface.kiara",
             function(err, conn) {
-                conn.registerFuncImplementation("omp.interface.implements", "...", function(interfaceURI) {
-                    var supportedInterfaces = [
-                        "http://localhost/home/kiara/idl/connect.idl"
-                    ];
-                    return supportedInterfaces.indexOf(interfaceURI) != -1;
+                if (err)
+                  callback(false, err);
+
+                self._configureInterfaces(function() {
+                    self.server["omp.connect.useCircuitCode"](
+                        self.loginResponse.circuit_code,
+                        self.loginResponse.agent_id,
+                        self.loginResponse.session_id
+                    );
                 });
-                conn.registerFuncImplementation("omp.connect.handshake", "...", function(arg) {
-                    logger.info("Received handshake: " + arg);
-                })
+                self.connectCallback = callback;
             }
         );
     }
@@ -207,6 +209,98 @@
         }
 
         KIARA.registerProtocol('websocket-json', JSONWebSocket);
+    }
+
+    // Client functions
+    OMP.Client.prototype._interfaceImplements = function(interfaceURI) {
+        var self = this;
+        return self.supportedInterfaces.indexOf(interfaceURI) != -1;
+    };
+
+    OMP.Client.prototype._connectRegionHandshake = function(handshakeRequest) {
+        logger.info("Received handshake request: " + handshakeRequest);
+        return 42;
+    }
+
+    // Configures local and remote interfaces. On success |callback| is called.
+    OMP.Client.prototype._configureInterfaces = function(callback) {
+        var self = this;
+
+        var localInterfaces = [
+            "http://yellow.cg.uni-saarland.de/home/kiara/idl/interface.kiara",
+            "http://yellow.cg.uni-saarland.de/home/kiara/idl/connectClient.kiara"
+        ];
+
+        var localFunctions = {
+            "omp.interface.implements": self._interfaceImplements,
+            "omp.connect.regionHandshake": self._connectRegionHandshake
+        }
+
+        var remoteInterfaces = [
+            "http://yellow.cg.uni-saarland.de/home/kiara/idl/interface.kiara",
+            "http://yellow.cg.uni-saarland.de/home/kiara/idl/connectServer.kiara"
+        ];
+
+        var remoteFunctions = [
+            "omp.interface.implements",
+            "omp.connect.useCircuitCode"
+        ];
+
+        // Configure local interfaces
+        self.supportedInterfaces = [];
+        for (var index in localInterfaces) {
+            self.regionConnection.loadIDL(localInterfaces[index]);
+            self.supportedInterfaces.push(localInterfaces[index]);
+        }
+
+        // Configure local functions
+        for (var localFunctionName in localFunctions) {
+            var localFunction = localFunctions[localFunctionName].bind(self);
+            self.regionConnection.registerFuncImplementation(
+                localFunctionName, "...", localFunction);
+        }
+
+        // Check remote interfaces
+        var numInterfaces = remoteInterfaces.length;
+        var loadedInterfaces = 0;
+        var failedToLoad = false;
+        self.server = {};
+
+        function errorCallback(reason) {
+            failedToLoad = true;
+            logger.error("Failed to acquire required server interfaces - " + reason);
+        }
+
+        function resultCallback(exception, result) {
+            if (failedToLoad)
+                return;
+
+            if (exception) {
+                errorCallback("exception returned by the client");
+            } else if (!result) {
+                errorCallback("not supported by the client");
+            } else {
+                loadedInterfaces += 1;
+                if (loadedInterfaces == numInterfaces) {
+                    // Configure remote functions.
+                    for (var index in remoteFunctions) {
+                        var remoteFunction = remoteFunctions[index];
+                        self.server[remoteFunction] = self.regionConnection.generateFuncWrapper(remoteFunction, "...");
+                    }
+                    // Execute... ehm, well... the callback. Is this comment even useful?
+                    callback();
+                }
+            }
+        }
+
+        var implements = self.server["omp.interface.implements"] =
+            self.regionConnection.generateFuncWrapper(
+                "omp.interface.implements", "...",
+                { onerror: errorCallback, onresult: resultCallback }
+            );
+
+        for (var index in remoteInterfaces)
+            implements(remoteInterfaces[index]);
     }
 
     return OMP;
