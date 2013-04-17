@@ -57,7 +57,9 @@
                     if (exception) {
                         logger.error("Got exception for login request: " + exception);
                     } else {
-                        self.loginResponse = result;
+                        self.circuitCode = result["circuit_code"];
+                        self.sessionID = result["session_id"];
+                        self.agentID = result["agent_id"];
                         callback();
                     }
                 });
@@ -70,7 +72,7 @@
 
     OMP.Client.prototype.connect = function(callback) {
         var self = this;
-        if (!self.loginResponse)
+        if (!self.sessionID || !self.agentID || !self.circuitCode)
             throw new KIARA.Error(KIARA.API_ERROR, "Login response missing to connect. Please login first.");
 
         var connection = self.regionConnection = self.context.openConnection(
@@ -81,9 +83,9 @@
 
                 self._configureInterfaces(function() {
                     self.server["omp.connect.useCircuitCode"](
-                        self.loginResponse.circuit_code,
-                        self.loginResponse.agent_id,
-                        self.loginResponse.session_id
+                        self.circuitCode,
+                        self.agentID,
+                        self.sessionID
                     );
                 });
                 self.connectCallback = callback;
@@ -218,8 +220,17 @@
     };
 
     OMP.Client.prototype._connectRegionHandshake = function(handshakeRequest) {
-        logger.info("Received handshake request: " + handshakeRequest);
-        return 42;
+        var self = this;
+        // TODO(rryk): Extract the necessary data from the |handshakeRequest|.
+        return {
+            AgentData: {
+              AgentID: self.agentID,
+              SessionID: self.sessionID
+            },
+            RegionInfo: {
+              Flags: 0
+            }
+        };
     }
 
     // Configures local and remote interfaces. On success |callback| is called.
