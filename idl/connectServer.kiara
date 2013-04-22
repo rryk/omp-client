@@ -1,5 +1,6 @@
 namespace * omp;
 
-service connectServer {
-  [Oneway] void useCircuitCode(u32 code, string agentID, string sessionID);
+service connect {
+  // TODO: completeAgentMovement
+  // TODO: logoutRequest
 }

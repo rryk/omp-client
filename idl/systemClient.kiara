@@ -1,0 +1,5 @@
+namespace * omp;
+
+service system {
+  // TODO: startPingCheck
+}

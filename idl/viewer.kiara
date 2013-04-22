@@ -1,0 +1,7 @@
+namespace * omp;
+
+service viewer {
+  // TODO: agentFOV
+  // TODO: setAlwaysRun
+  // TODO: agentHeightWidth
+}

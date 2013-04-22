@@ -1,0 +1,6 @@
+namespace * omp;
+
+service environment {
+  // TODO: layerData
+  // TODO: simStats
+}

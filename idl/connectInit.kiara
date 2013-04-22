@@ -1,0 +1,5 @@
+namespace * omp;
+
+service connect {
+  [Oneway] void useCircuitCode(u32 code, string agentID, string sessionID);
+}

@@ -1,0 +1,7 @@
+namespace * omp;
+
+service objects {
+  // TODO: improvedTerseObjectUpdate
+  // TODO: objectUpdate
+  // TODO: killObject
+}
