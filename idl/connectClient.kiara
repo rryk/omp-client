@@ -36,4 +36,6 @@ struct RegionHandshakeRequest {
 
 service connect {
   RegionHandshakeReply regionHandshake(RegionHandshakeRequest request);
+  // TODO: agentMovementComplete
+  // TODO: loginReply
 }
