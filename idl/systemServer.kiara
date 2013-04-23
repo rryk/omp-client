@@ -1,6 +1,5 @@
 namespace * omp;
 
 service system {
-  // TODO: agentThrottle
   // TODO: startPingCheck
 }
