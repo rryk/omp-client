@@ -1,5 +1,0 @@
-namespace * omp;
-
-service system {
-  int pingCheck(int id);
-}

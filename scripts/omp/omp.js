@@ -3,21 +3,41 @@
         // Node. Does not work with strict CommonJS, but
         // only CommonJS-like enviroments that support module.exports,
         // like Node.
-        module.exports = factory(require('logger'), require('kiara'), require('md5'), require('omp'));
+        module.exports = factory(require('logger'), require('kiara'), require('md5'), require('omp'), require('base64'));
     } else if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
-        define(['logger', 'kiara', 'md5'], function (logger, kiara, md5) {
-            return (root.OMP = factory(logger, kiara, md5));
+        define(['logger', 'kiara', 'md5', 'base64'], function (logger, kiara, md5, base64) {
+            return (root.OMP = factory(logger, kiara, md5, base64));
         });
     } else {
         // Browser globals
-        root.OMP = factory(root.logger, root.KIARA, root.md5);
+        root.OMP = factory(root.logger, root.KIARA, root.md5, root.base64);
     }
-} (this, function (logger, KIARA, md5) {
+} (this, function (logger, KIARA, md5, base64) {
     var OMP = OMP || {};
 
+    var isNode = (typeof process === 'object' && typeof require === 'function');
+    var isWeb = typeof window === 'object';
+    var isWorker = typeof importScripts === 'function';
+
+    if (isNode) {
+        var util = require('util');
+    } else {
+        var util = {};
+        util.inherits = function(ctor, superCtor) {
+            ctor.super_ = superCtor;
+            ctor.prototype = Object.create(superCtor.prototype);
+            ctor.prototype.constructor = ctor;
+            ctor.superclass = superCtor.prototype;
+        };
+    }
+
+    //  =============================== Client ===============================
+
     OMP.Client = function () {
-        this._registerProtocols();
+        var self = this;
+
+        self._registerProtocols();
     }
 
     OMP.Client.prototype.login = function (first, last, password, callback) {
@@ -81,14 +101,22 @@
                 if (err)
                   callback(false, err);
 
-                self._configureInterfaces(function() {
-                    self.server["omp.connect.useCircuitCode"](
-                        self.circuitCode,
-                        self.agentID,
-                        self.sessionID
-                    );
+                self.server = {};
+                self.supportedInterfaces = ["http://yellow.cg.uni-saarland.de/home/kiara/idl/interface.kiara"];
+                self.regionConnection.loadIDL("http://yellow.cg.uni-saarland.de/home/kiara/idl/interface.kiara");
+                self.server["omp.interface.implements"] =
+                    self.regionConnection.generateFuncWrapper("omp.interface.implements", "...");
+
+                self._configureConnectInterfaces(function() {
+                    self._configureAppInterfaces(function() {
+                        self.server["omp.connectInit.useCircuitCode"](
+                            self.circuitCode,
+                            self.agentID,
+                            self.sessionID
+                        );
+                        self.clientCallback = callback;
+                    });
                 });
-                self.connectCallback = callback;
             }
         );
     }
@@ -221,47 +249,23 @@
 
     OMP.Client.prototype._connectRegionHandshake = function(handshakeRequest) {
         var self = this;
-        // TODO(rryk): Extract the necessary data from the |handshakeRequest|.
-        return {
-            AgentData: {
-              AgentID: self.agentID,
-              SessionID: self.sessionID
-            },
-            RegionInfo: {
-              Flags: 0
-            }
-        };
+        self.server["omp.connectServer.handshakeReply"]({
+            AgentData: {AgentID: self.agentID, SessionID: self.sessionID},
+            RegionInfo: {Flags: 0}
+        });
+        self.clientCallback();
     }
 
-    // Configures local and remote interfaces. On success |callback| is called.
-    OMP.Client.prototype._configureInterfaces = function(callback) {
+    OMP.Client.prototype._configureInterfaces = function(localInterfaces, localFunctions, remoteInterfaces,
+                                                         remoteFunctions, callback) {
         var self = this;
 
-        var localInterfaces = [
-            "http://yellow.cg.uni-saarland.de/home/kiara/idl/interface.kiara",
-            "http://yellow.cg.uni-saarland.de/home/kiara/idl/connectClient.kiara"
-        ];
-
-        var localFunctions = {
-            "omp.interface.implements": self._interfaceImplements,
-            "omp.connect.regionHandshake": self._connectRegionHandshake
-        }
-
-        var remoteInterfaces = [
-            "http://yellow.cg.uni-saarland.de/home/kiara/idl/interface.kiara",
-            "http://yellow.cg.uni-saarland.de/home/kiara/idl/connectServer.kiara"
-        ];
-
-        var remoteFunctions = [
-            "omp.interface.implements",
-            "omp.connect.useCircuitCode"
-        ];
-
         // Configure local interfaces
-        self.supportedInterfaces = [];
-        for (var index in localInterfaces) {
-            self.regionConnection.loadIDL(localInterfaces[index]);
-            self.supportedInterfaces.push(localInterfaces[index]);
+        for (var index = 0; index < remoteInterfaces.length; index++) {
+            if (!self._interfaceImplements(localInterfaces[index])) {
+                self.regionConnection.loadIDL(localInterfaces[index]);
+                self.supportedInterfaces.push(localInterfaces[index]);
+            }
         }
 
         // Configure local functions
@@ -275,7 +279,6 @@
         var numInterfaces = remoteInterfaces.length;
         var loadedInterfaces = 0;
         var failedToLoad = false;
-        self.server = {};
 
         function errorCallback(reason) {
             failedToLoad = true;
@@ -294,7 +297,7 @@
                 loadedInterfaces += 1;
                 if (loadedInterfaces == numInterfaces) {
                     // Configure remote functions.
-                    for (var index in remoteFunctions) {
+                    for (var index = 0; index < remoteInterfaces.length; index++) {
                         var remoteFunction = remoteFunctions[index];
                         self.server[remoteFunction] = self.regionConnection.generateFuncWrapper(remoteFunction, "...");
                     }
@@ -304,14 +307,109 @@
             }
         }
 
-        var implements = self.server["omp.interface.implements"] =
-            self.regionConnection.generateFuncWrapper(
-                "omp.interface.implements", "...",
-                { onerror: errorCallback, onresult: resultCallback }
-            );
+        for (var index = 0; index < remoteInterfaces.length; index++) {
+            self.server["omp.interface.implements"](remoteInterfaces[index])
+                .on('result', resultCallback)
+                .on('error', errorCallback)
+            self.regionConnection.loadIDL(remoteInterfaces[index]);
+        }
+    }
 
-        for (var index in remoteInterfaces)
-            implements(remoteInterfaces[index]);
+    // Configures local and remote interfaces. On success |callback| is called.
+    OMP.Client.prototype._configureConnectInterfaces = function(callback) {
+        var self = this;
+
+        var localInterfaces = [
+            "http://yellow.cg.uni-saarland.de/home/kiara/idl/interface.kiara",
+            "http://yellow.cg.uni-saarland.de/home/kiara/idl/connectClient.kiara"
+        ];
+
+        var localFunctions = {
+            "omp.interface.implements": self._interfaceImplements,
+            "omp.connectClient.handshake": self._connectRegionHandshake
+        };
+
+        var remoteInterfaces = [
+            "http://yellow.cg.uni-saarland.de/home/kiara/idl/connectServer.kiara",
+            "http://yellow.cg.uni-saarland.de/home/kiara/idl/connectInit.kiara"
+        ];
+
+        var remoteFunctions = [
+            "omp.connectServer.handshakeReply",
+            "omp.connectInit.useCircuitCode"
+        ];
+
+        self._configureInterfaces(localInterfaces, localFunctions, remoteInterfaces, remoteFunctions, callback);
+    }
+
+    // Configure interfaces after handshake is received
+    OMP.Client.prototype._configureAppInterfaces = function(callback) {}
+
+    //  =============================== ChatClient ===============================
+
+    OMP.ChatClient = function(onMessage, onTypingStatus) {
+        var self = this;
+
+        OMP.Client.call(self);
+        self.onMessage = onMessage;
+        self.onTypingStatus = onTypingStatus;
+    }
+    util.inherits(OMP.ChatClient, OMP.Client);
+
+    OMP.ChatClient.prototype._handleMessageFromServer = function(packet) {
+        var self = this;
+
+        var from = base64.decode(packet.ChatData.FromName);
+        if (packet.ChatData.ChatType >= 0 && packet.ChatData.ChatType <= 3) {
+            var msg = base64.decode(packet.ChatData.Message);
+            self.onMessage(from, msg);
+        } else if (packet.ChatData.ChatType == 4) {
+            if (packet.ChatData.SourceID.Guid != self.agentID)
+                self.onTypingStatus(from, true);
+        } else if (packet.ChatData.ChatType == 5) {
+            if (packet.ChatData.SourceID.Guid != self.agentID)
+                self.onTypingStatus(from, false);
+        } else {
+            self.onMessage("Debug", JSON.stringify(packet))
+        }
+    }
+
+    OMP.ChatClient.prototype._configureAppInterfaces = function(callback) {
+        var self = this;
+
+        var localInterfaces = [
+            "http://yellow.cg.uni-saarland.de/home/kiara/idl/chatClient.kiara"
+        ];
+
+        var localFunctions = {
+            "omp.chatClient.messageFromServer": self._handleMessageFromServer
+        }
+
+        var remoteInterfaces = [
+            "http://yellow.cg.uni-saarland.de/home/kiara/idl/chatServer.kiara"
+        ];
+
+        var remoteFunctions = [
+            "omp.chatServer.messageFromClient"
+        ];
+
+        self._configureInterfaces(localInterfaces, localFunctions, remoteInterfaces, remoteFunctions, callback);
+    }
+
+    OMP.ChatClient.prototype.sendMessage = function(message) {
+        var self = this;
+        self.server["omp.chatServer.messageFromClient"]({
+            AgentData: {AgentID: self.agentID, SessionID: self.sessionID},
+            ChatData: {Channel: 0, Message: base64.encode(message), Type: 2}
+        });
+    }
+
+    OMP.ChatClient.prototype.setTypingStatus = function(isTyping) {
+        var self = this;
+        self.server["omp.chatServer.messageFromClient"]({
+            AgentData: {AgentID: self.agentID, SessionID: self.sessionID},
+            ChatData: {Channel: 0, Message: "", Type: (isTyping ? 4 : 5)}
+        });
     }
 
     return OMP;

@@ -1162,6 +1162,7 @@
                 _this._events[name] = [handler];
             if (_this._listenerAdded)
                 _this._listenerAdded(name, handler);
+            return _this;
         };
 
         _this.on = _this.addListener;
@@ -1267,7 +1268,7 @@
     }
 
     CallResponse.prototype.setResult = function(result, resultType) {
-        if (resultType != 'result' && resultType != 'error')
+        if (resultType != 'result' && resultType != 'error' && resultType != 'exception')
             throw new KIARAError(KIARA.INVALID_ARGUMENT, "Unsupported result type: "+resultType);
         this._result = result;
         this._resultType = resultType;
@@ -1280,7 +1281,7 @@
     }
 
     CallResponse.prototype._handleResult = function() {
-        if (this._result && this._resultType) {
+        if (this._result != undefined && this._resultType) {
             var emitArgs = null;
             // special case for 'result' and 'exception'
             if (this._resultType == 'result' && this.hasListeners('result'))
@@ -1405,7 +1406,7 @@
     }
 
     Connection.prototype._isOneWay = function(qualifiedMethodName) {
-        var onewayMethods = ["omp.connect.handshake"];
+        var onewayMethods = ["omp.connectClient.handshake"];
         return onewayMethods.indexOf(qualifiedMethodName) != -1;
     }
 
@@ -1454,7 +1455,7 @@
 
         var protocolCtor = getProtocol(protocolName);
         if (!protocolCtor)
-            handleError(new KIARAError(KIARA.UNSUPPORTED_FEATURE, "Protocol '"+protoclName+"' is not supported"));
+            handleError(new KIARAError(KIARA.UNSUPPORTED_FEATURE, "Protocol '"+protocolName+"' is not supported"));
         try {
             this._protocol = new protocolCtor(protocolUrl);
         } catch (e) {

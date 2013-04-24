@@ -1,9 +1,0 @@
-namespace * omp;
-
-service agents {
-  // TODO: agentSetAppearance
-  // TODO: agentUpdate
-  // TODO: agentWearablesRequest
-  // TODO: agentAnimation
-  // TODO: agentIsNowWearing
-}

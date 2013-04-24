@@ -1,6 +1,5 @@
 namespace * omp;
 
-service connect {
-  // TODO: completeAgentMovement
-  // TODO: logoutRequest
+service connectServer {
+  [Oneway] void handshakeReply(RegionHandshakeReply packet);
 }

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OMP Client</title>
+    <script data-main="scripts/app.js" type="text/javascript" src="scripts/require.js"></script>
+</head>
+<body>
+    <div id="loginForm">
+        <label for="firstname">First name:</label><input id="firstname" value="Test"/> <br/>
+        <label for="lastname">Last name:</label><input id="lastname" value="User"/> <br/>
+        <label for="pass">Password:</label><input type="password" id="pass" value="123"/> <br/>
+        <button id="loginBtn" disabled="disabled">Login</button>
+    </div>
+    <div id="chatInterface" style="display: none">
+        <div id="log" style="height: 500px; background-color: black; color: white; font-family: monospace;"></div>
+        <input id="say" style="width: 100%" />
+    </div>
+</body>
+</html>

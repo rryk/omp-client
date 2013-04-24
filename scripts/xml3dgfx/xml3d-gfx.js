@@ -21,6 +21,10 @@
         root.XML3DGraphics = factory();
     }
 } (this, function () {
+    var isNode = (typeof process === 'object' && typeof require === 'function');
+    var isWeb = typeof window === 'object';
+    var isWorker = typeof importScripts === 'function';
+
     if (isNode) {
         var util = require('util');
     } else {

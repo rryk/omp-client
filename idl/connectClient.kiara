@@ -1,41 +1,5 @@
 namespace * omp;
 
-struct RegionHandshakeReply {
-  [UUID] string agentID;
-  [UUID] string sessionID;
-  u32 flags;
-}
-
-struct RegionHandshakeRequest {
-  u32 regionFlags;
-  u8 simAccess;
-  string simName;
-  [UUID] string simOwner;
-  bool isEstateManager;
-  float waterHeight;
-  float billableFactor;
-  [UUID] string cacheID;
-  [UUID] string terrainBase0;
-  [UUID] string terrainBase1;
-  [UUID] string terrainBase2;
-  [UUID] string terrainBase3;
-  [UUID] string terrainDetail0;
-  [UUID] string terrainDetail1;
-  [UUID] string terrainDetail2;
-  [UUID] string terrainDetail3;
-  float terrainStartHeight00;
-  float terrainStartHeight01;
-  float terrainStartHeight10;
-  float terrainStartHeight11;
-  float terrainHeightRange00;
-  float terrainHeightRange01;
-  float terrainHeightRange10;
-  float terrainHeightRange11;
-  
-}
-
-service connect {
-  RegionHandshakeReply regionHandshake(RegionHandshakeRequest request);
-  // TODO: agentMovementComplete
-  // TODO: loginReply
+service connectClient {
+  [Oneway] void handshake(RegionHandshakeRequest packet);
 }

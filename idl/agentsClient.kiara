@@ -1,8 +1,0 @@
-namespace * omp;
-
-service agents {
-  // TODO: avatarAppearance
-  // TODO: avatarAnimation
-  // TODO: coarseLocationUpdate
-  // TODO: agentWearablesUpdate
-}

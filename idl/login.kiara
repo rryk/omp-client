@@ -48,5 +48,4 @@ struct LoginResponse {
 
 service login {
   LoginResponse login(LoginRequest request);
-  int foobar(float a, FullName b);
 }

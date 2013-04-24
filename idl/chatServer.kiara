@@ -1,0 +1,5 @@
+namespace * omp;
+
+service chatServer {
+  [Oneway] void messageFromClient(ChatFromViewer packet);
+}
