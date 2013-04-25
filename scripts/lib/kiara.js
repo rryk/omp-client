@@ -1406,7 +1406,19 @@
     }
 
     Connection.prototype._isOneWay = function(qualifiedMethodName) {
-        var onewayMethods = ["omp.connectClient.handshake"];
+        var onewayMethods = [
+            "omp.connectClient.handshake",
+            "omp.connectInit.useCircuitCode",
+            "omp.connectServer.handshakeReply",
+            "omp.objectSync.updateObject",
+            "omp.objectSync.deleteObject",
+            "omp.objectSync.locationUpdate",
+            "omp.movement.updateAvatarLocation",
+            "omp.movement.updateAvatarMovement",
+            "omp.chatServer.messageFromClient",
+            "omp.chatClient.messageFromServer",
+            "omp.animationServer.startAnimation"
+        ];
         return onewayMethods.indexOf(qualifiedMethodName) != -1;
     }
 

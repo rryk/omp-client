@@ -35,7 +35,7 @@ requirejs.config({
     waitSeconds: 60, // wait 1 minute for scripts (maybe slow on mobile network)
 });
 
-requirejs(['omp/omp', 'jquery'],
+requirejs(['omp/omp', 'jquery', 'base64'],
 function(OMP, $, base64) {
     $("#loginBtn").click(function() {
         var typingUsers = [];

@@ -1,0 +1,5 @@
+namespace * omp;
+
+service animationServer {
+   [Oneway] void startAnimation(string uuid, ...);
+}

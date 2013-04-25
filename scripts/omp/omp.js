@@ -253,7 +253,9 @@
             AgentData: {AgentID: self.agentID, SessionID: self.sessionID},
             RegionInfo: {Flags: 0}
         });
+
         self.clientCallback();
+        delete self.clientCallback;
     }
 
     OMP.Client.prototype._configureInterfaces = function(localInterfaces, localFunctions, remoteInterfaces,
@@ -261,7 +263,7 @@
         var self = this;
 
         // Configure local interfaces
-        for (var index = 0; index < remoteInterfaces.length; index++) {
+        for (var index = 0; index < localInterfaces.length; index++) {
             if (!self._interfaceImplements(localInterfaces[index])) {
                 self.regionConnection.loadIDL(localInterfaces[index]);
                 self.supportedInterfaces.push(localInterfaces[index]);
@@ -279,6 +281,11 @@
         var numInterfaces = remoteInterfaces.length;
         var loadedInterfaces = 0;
         var failedToLoad = false;
+
+        if (numInterfaces == 0) {
+            callback();
+            return;
+        }
 
         function errorCallback(reason) {
             failedToLoad = true;
@@ -307,7 +314,7 @@
             }
         }
 
-        for (var index = 0; index < remoteInterfaces.length; index++) {
+        for (var index = 0; index < numInterfaces; index++) {
             self.server["omp.interface.implements"](remoteInterfaces[index])
                 .on('result', resultCallback)
                 .on('error', errorCallback)
@@ -410,6 +417,60 @@
             AgentData: {AgentID: self.agentID, SessionID: self.sessionID},
             ChatData: {Channel: 0, Message: "", Type: (isTyping ? 4 : 5)}
         });
+    }
+
+    //  =============================== ViewerClient ===============================
+
+    OMP.ViewerClient = function(onCreateObject, onDeleteObject, onLocationUpdate) {
+        var self = this;
+
+        OMP.Client.call(self);
+        self.onCreateObject = onCreateObject;
+        self.onDeleteObject = onDeleteObject;
+        self.onLocationUpdate = onLocationUpdate;
+    }
+    util.inherits(OMP.ViewerClient, OMP.Client);
+
+    OMP.ViewerClient.prototype._handleCreateObject = function(id, xml3dRepresentation) {
+        var self = this;
+
+        self.onCreateObject(id, xml3dRepresentation);
+    }
+
+    OMP.ViewerClient.prototype._handleDeleteObject = function(id) {
+        var self = this;
+
+        self.onDeleteObject(id, xml3dRepresentation);
+    }
+
+    OMP.ViewerClient.prototype._handleLocationUpdate = function(id, position, rotation, scale) {
+        var self = this;
+
+        self.onLocationUpdate(
+            id,
+            {x: position.X, y: position.Y, z: position.Z},
+            {x: rotation.X, y: rotation.Y, z: rotation.Z, w: rotation.W},
+            {x: scale.X, y: scale.Y, z: scale.Z}
+        );
+    }
+
+    OMP.ViewerClient.prototype._configureAppInterfaces = function(callback) {
+        var self = this;
+
+        var localInterfaces = [
+            "http://yellow.cg.uni-saarland.de/home/kiara/idl/objectSync.kiara"
+        ];
+
+        var localFunctions = {
+            "omp.objectSync.createObject": self._handleCreateObject,
+            "omp.objectSync.deleteObject": self._handleDeleteObject,
+            "omp.objectSync.locationUpdate": self._handleLocationUpdate,
+        }
+
+        var remoteInterfaces = [];
+        var remoteFunctions = [];
+
+        self._configureInterfaces(localInterfaces, localFunctions, remoteInterfaces, remoteFunctions, callback);
     }
 
     return OMP;
