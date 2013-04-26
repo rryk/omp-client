@@ -49,7 +49,7 @@
         var self = this;
 
         var context = self.context = KIARA.createContext();
-        self.loginConnection = context.openConnection(REMOTE_IDL_URL_PREFIX+"login.kiara",
+        self.loginConnection = context.openConnection(REMOTE_IDL_URL_PREFIX + "login.kiara",
             function (err, conn) {
                 if (err) {
                     logger.error(err);
@@ -101,14 +101,14 @@
             throw new KIARA.Error(KIARA.API_ERROR, "Login response missing to connect. Please login first.");
 
         var connection = self.regionConnection = self.context.openConnection(
-            REMOTE_IDL_URL_PREFIX+"interface.kiara",
+            REMOTE_IDL_URL_PREFIX + "interface.kiara",
             function(err, conn) {
                 if (err)
                   callback(false, err);
 
                 self.server = {};
-                self.supportedInterfaces = [REMOTE_IDL_URL_PREFIX+"interface.kiara"];
-                self.regionConnection.loadIDL(REMOTE_IDL_URL_PREFIX+"interface.kiara");
+                self.supportedInterfaces = [REMOTE_IDL_URL_PREFIX + "interface.kiara"];
+                self.regionConnection.loadIDL(REMOTE_IDL_URL_PREFIX + "interface.kiara");
                 self.server["omp.interface.implements"] =
                     self.regionConnection.generateFuncWrapper("omp.interface.implements", "...");
 
@@ -332,8 +332,8 @@
         var self = this;
 
         var localInterfaces = [
-            REMOTE_IDL_URL_PREFIX+"interface.kiara",
-            REMOTE_IDL_URL_PREFIX+"connectClient.kiara"
+            REMOTE_IDL_URL_PREFIX + "interface.kiara",
+            REMOTE_IDL_URL_PREFIX + "connectClient.kiara"
         ];
 
         var localFunctions = {
@@ -342,8 +342,8 @@
         };
 
         var remoteInterfaces = [
-            REMOTE_IDL_URL_PREFIX+"connectServer.kiara",
-            REMOTE_IDL_URL_PREFIX+"connectInit.kiara"
+            REMOTE_IDL_URL_PREFIX + "connectServer.kiara",
+            REMOTE_IDL_URL_PREFIX + "connectInit.kiara"
         ];
 
         var remoteFunctions = [
@@ -390,7 +390,7 @@
         var self = this;
 
         var localInterfaces = [
-            REMOTE_IDL_URL_PREFIX+"chatClient.kiara"
+            REMOTE_IDL_URL_PREFIX + "chatClient.kiara"
         ];
 
         var localFunctions = {
@@ -398,7 +398,7 @@
         }
 
         var remoteInterfaces = [
-            REMOTE_IDL_URL_PREFIX+"chatServer.kiara"
+            REMOTE_IDL_URL_PREFIX + "chatServer.kiara"
         ];
 
         var remoteFunctions = [
@@ -473,7 +473,7 @@
         var self = this;
 
         var localInterfaces = [
-            REMOTE_IDL_URL_PREFIX+"objectSync.kiara"
+            REMOTE_IDL_URL_PREFIX + "objectSync.kiara"
         ];
 
         var localFunctions = {
