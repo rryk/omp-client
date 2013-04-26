@@ -426,7 +426,7 @@
 
     //  =============================== ViewerClient ===============================
 
-    // User handlers may be passed to the constructor:
+    // User handlers may be passed to the constructor. The signatures for them are:
     //   onCreateObject(id, xml3dRepresentation, isAgentAvatar)
     //   onDeleteObject(id)
     //   onLocationUpdate(id, pos, rot, scale)
@@ -491,6 +491,38 @@
         ];
 
         self._configureInterfaces(localInterfaces, localFunctions, remoteInterfaces, remoteFunctions, callback);
+    }
+
+    // Notifies the server about the state of the user's viewer. Arguments describe this state:
+    //   |position| - position of the avatar, any object with x, y and z properties
+    //   |rotation| - rotation of the avatar, any object with x, y, z and w properties
+    //   |cameraUp|, |cameraLeft|, |cameraAt| - vectors looking upwards, left and in the direction of
+    //                                          the user's camera, any object with x, y and z properties
+    //   |controls| - a number describing user controls, documentation: http://goo.gl/UplNa,
+    //                used in OpenSim to run scripts triggered by user actions, may be omitted
+    OMP.ViewerClient.prototype.setViewerState = /*void*/ function(position, rotation, cameraUp,
+                                                                  cameraLeft, cameraAt, controls) {
+        var self = this;
+
+        if (!controls)
+          controls = 0;
+
+        self.server["omp.movement.agentUpdate"]({
+            AgentData: {
+                AgentID: self.agentID,
+                BodyRotation: {X: rotation.x, Y: rotation.y, Z: rotation.z, W: rotation.w},
+                CameraAtAxis: {X: cameraAt.x, Y: cameraAt.y, Z: cameraAt.z},
+                CameraCenter: {X: position.x, Y: position.y, Z: position.z},
+                CameraLeftAxis: {X: cameraLeft.x, Y: cameraLeft.y, Z: cameraLeft.z},
+                CameraUpAxis: {X: cameraUp.x, Y: cameraUp.y, Z: cameraUp.z},
+                ControlFlags: controls,
+                Far: 1e9,
+                Flags: 0,
+                HeadRotation: {X: rotation.x, Y: rotation.y, Z: rotation.z, W: rotation.w},
+                SessionID: self.sessionID,
+                State: 0
+            }
+        });
     }
 
     return OMP;
