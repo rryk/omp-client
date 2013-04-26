@@ -14,6 +14,11 @@
         root.OMP = factory(root.logger, root.KIARA, root.md5, root.base64);
     }
 } (this, function (logger, KIARA, md5, base64) {
+
+    var REMOTE_IDL_URL_PREFIX = "http://yellow.cg.uni-saarland.de/home/kiara/idl/";
+    //var REMOTE_IDL_URL_PREFIX = "http://localhost:8080/idl/";
+
+
     var OMP = OMP || {};
 
     var isNode = (typeof process === 'object' && typeof require === 'function');
@@ -44,7 +49,7 @@
         var self = this;
 
         var context = self.context = KIARA.createContext();
-        self.loginConnection = context.openConnection("http://yellow.cg.uni-saarland.de/home/kiara/idl/login.kiara",
+        self.loginConnection = context.openConnection(REMOTE_IDL_URL_PREFIX+"login.kiara",
             function (err, conn) {
                 if (err) {
                     logger.error(err);
@@ -96,14 +101,14 @@
             throw new KIARA.Error(KIARA.API_ERROR, "Login response missing to connect. Please login first.");
 
         var connection = self.regionConnection = self.context.openConnection(
-            "http://yellow.cg.uni-saarland.de/home/kiara/idl/interface.kiara",
+            REMOTE_IDL_URL_PREFIX+"interface.kiara",
             function(err, conn) {
                 if (err)
                   callback(false, err);
 
                 self.server = {};
-                self.supportedInterfaces = ["http://yellow.cg.uni-saarland.de/home/kiara/idl/interface.kiara"];
-                self.regionConnection.loadIDL("http://yellow.cg.uni-saarland.de/home/kiara/idl/interface.kiara");
+                self.supportedInterfaces = [REMOTE_IDL_URL_PREFIX+"interface.kiara"];
+                self.regionConnection.loadIDL(REMOTE_IDL_URL_PREFIX+"interface.kiara");
                 self.server["omp.interface.implements"] =
                     self.regionConnection.generateFuncWrapper("omp.interface.implements", "...");
 
@@ -327,8 +332,8 @@
         var self = this;
 
         var localInterfaces = [
-            "http://yellow.cg.uni-saarland.de/home/kiara/idl/interface.kiara",
-            "http://yellow.cg.uni-saarland.de/home/kiara/idl/connectClient.kiara"
+            REMOTE_IDL_URL_PREFIX+"interface.kiara",
+            REMOTE_IDL_URL_PREFIX+"connectClient.kiara"
         ];
 
         var localFunctions = {
@@ -337,8 +342,8 @@
         };
 
         var remoteInterfaces = [
-            "http://yellow.cg.uni-saarland.de/home/kiara/idl/connectServer.kiara",
-            "http://yellow.cg.uni-saarland.de/home/kiara/idl/connectInit.kiara"
+            REMOTE_IDL_URL_PREFIX+"connectServer.kiara",
+            REMOTE_IDL_URL_PREFIX+"connectInit.kiara"
         ];
 
         var remoteFunctions = [
@@ -385,7 +390,7 @@
         var self = this;
 
         var localInterfaces = [
-            "http://yellow.cg.uni-saarland.de/home/kiara/idl/chatClient.kiara"
+            REMOTE_IDL_URL_PREFIX+"chatClient.kiara"
         ];
 
         var localFunctions = {
@@ -393,7 +398,7 @@
         }
 
         var remoteInterfaces = [
-            "http://yellow.cg.uni-saarland.de/home/kiara/idl/chatServer.kiara"
+            REMOTE_IDL_URL_PREFIX+"chatServer.kiara"
         ];
 
         var remoteFunctions = [
@@ -468,7 +473,7 @@
         var self = this;
 
         var localInterfaces = [
-            "http://yellow.cg.uni-saarland.de/home/kiara/idl/objectSync.kiara"
+            REMOTE_IDL_URL_PREFIX+"objectSync.kiara"
         ];
 
         var localFunctions = {
