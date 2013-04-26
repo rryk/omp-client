@@ -482,8 +482,13 @@
             "omp.objectSync.locationUpdate": self._handleLocationUpdate,
         }
 
-        var remoteInterfaces = [];
-        var remoteFunctions = [];
+        var remoteInterfaces = [
+            REMOTE_IDL_URL_PREFIX + "movement.kiara"
+        ];
+
+        var remoteFunctions = [
+            "omp.movement.agentUpdate"
+        ];
 
         self._configureInterfaces(localInterfaces, localFunctions, remoteInterfaces, remoteFunctions, callback);
     }
