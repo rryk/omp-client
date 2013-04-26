@@ -38,32 +38,32 @@ function(OMP, $, XML3DGraphics) {
     var visible = {};
 
     function handleCreateObject(id, xml3d, isAgentAvatar) {
-        if (objects[uuid] != undefined)
-            throw KIARA.Error(KIARA.API_ERROR, "Object with " + uuid + " exists already.");
+        if (objects[id] != undefined)
+            throw KIARA.Error(KIARA.API_ERROR, "Object with " + id + " exists already.");
 
-        objects[uuid] = xml3dGraphics.createSimpleObject(uuid, xml3d);
-        visible[uuid] = false;
+        objects[id] = xml3dGraphics.createSimpleObject(id, xml3d);
+        visible[id] = false;
     }
 
     function handleDeleteObject(id) {
-        if (objects[uuid] == undefined)
-            throw KIARA.Error(KIARA.API_ERROR, "Object with " + uuid + " does not exist.");
+        if (objects[id] == undefined)
+            throw KIARA.Error(KIARA.API_ERROR, "Object with " + id + " does not exist.");
 
-        xml3dGraphics.removeSimpleObject(objects[uuid]);
+        xml3dGraphics.removeSimpleObject(objects[id]);
 
-        delete objects[uuid];
-        delete visible[uuid];
+        delete objects[id];
+        delete visible[id];
     }
 
     function handleLocationUpdate(id, pos, rot, scale) {
-        if (objects[uuid] == undefined)
-            throw KIARA.Error(KIARA.API_ERROR, "Object with " + uuid + " does not exist.");
+        if (objects[id] == undefined)
+            throw KIARA.Error(KIARA.API_ERROR, "Object with " + id + " does not exist.");
 
-        objects[uuid].setLocation(pos, rot, scale);
+        objects[id].setLocation(pos, rot, scale);
 
-        if (!visible[uuid]) {
-            xml3dGraphics.addSimpleObject(objects[uuid]);
-            visible[uuid] = true;
+        if (!visible[id]) {
+            xml3dGraphics.addSimpleObject(objects[id]);
+            visible[id] = true;
         }
     }
 
