@@ -421,6 +421,10 @@
 
     //  =============================== ViewerClient ===============================
 
+    // User handlers may be passed to the constructor:
+    //   onCreateObject(id, xml3dRepresentation, isAgentAvatar)
+    //   onDeleteObject(id)
+    //   onLocationUpdate(id, pos, rot, scale)
     OMP.ViewerClient = function(onCreateObject, onDeleteObject, onLocationUpdate) {
         var self = this;
 
@@ -431,27 +435,33 @@
     }
     util.inherits(OMP.ViewerClient, OMP.Client);
 
-    OMP.ViewerClient.prototype._handleCreateObject = function(id, xml3dRepresentation) {
+    OMP.ViewerClient.prototype._handleCreateObject = function(uuid, localID, xml3dRepresentation) {
         var self = this;
 
-        self.onCreateObject(id, xml3dRepresentation);
+        if (self.onCreateObject)
+            self.onCreateObject(localID, xml3dRepresentation, uuid == self.agentID);
     }
 
-    OMP.ViewerClient.prototype._handleDeleteObject = function(id) {
+    OMP.ViewerClient.prototype._handleDeleteObject = function(localIDs) {
         var self = this;
 
-        self.onDeleteObject(id, xml3dRepresentation);
+        if (self.onDeleteObject) {
+            for (var index = 0; index < localIDs.length; index++)
+                self.onDeleteObject(localIDs[index]);
+        }
     }
 
-    OMP.ViewerClient.prototype._handleLocationUpdate = function(id, position, rotation, scale) {
+    OMP.ViewerClient.prototype._handleLocationUpdate = function(localID, position, rotation, scale) {
         var self = this;
 
-        self.onLocationUpdate(
-            id,
-            {x: position.X, y: position.Y, z: position.Z},
-            {x: rotation.X, y: rotation.Y, z: rotation.Z, w: rotation.W},
-            {x: scale.X, y: scale.Y, z: scale.Z}
-        );
+        if (self.onLocationUpdate) {
+            self.onLocationUpdate(
+                localID,
+                {x: position.X, y: position.Y, z: position.Z},
+                {x: rotation.X, y: rotation.Y, z: rotation.Z, w: rotation.W},
+                {x: scale.X, y: scale.Y, z: scale.Z}
+            );
+        }
     }
 
     OMP.ViewerClient.prototype._configureAppInterfaces = function(callback) {

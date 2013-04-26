@@ -59,10 +59,13 @@
     XML3DSimpleObject = function(id, xml3dRepresentation) {
         XML3DObject.call(this, id);
         this._group = XML3D.createElement("group");
-        var parsedXML3DDocument = (new DOMParser()).parseFromString(
-            xml3dRepresentation, "application/xml");
-        this._group.appendChild(parsedXML3DDocument.documentElement);
         this._group.setAttribute("id", this.id());
+
+        if (typeof(xml3dRepresentation) == "string") {
+            var parsedXML3DDocument = (new DOMParser()).parseFromString(
+                xml3dRepresentation, "application/xml");
+            this._group.appendChild(parsedXML3DDocument.documentElement);
+        }
 
         var transformID = "transform" + XML3DObject.generateID();
         this._transform = XML3D.createElement("transform");
@@ -189,8 +192,16 @@
 
     // Initializes XML3D scene in the |container|.
     XML3DGraphics.prototype.initScene = /*void*/ function(/*Element*/ container) {
+//        if (container.namespaceURI == XML3D.xml3dNS && container.nodeName.toLowerCase() == "xml3d") {
+//            this._scene = container;
+//            return;
+//        }
+
         this._scene = XML3D.createElement("xml3d");
+        this._scene.setAttribute("width", "800");
+        this._scene.setAttribute("height", "600");
         container.appendChild(this._scene);
+        XML3D.webgl.configure([this._scene]);
     }
 
     // Constructs a new MeshObject constructed from |index| and |pos| arrays.

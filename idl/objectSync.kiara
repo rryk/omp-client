@@ -8,9 +8,10 @@ struct Quatf {
   float W, Z, X, Y;
 }
 
+// Server-to-client object synchronization.
 service objectSync {
-   [Oneway] void createObject(u32 id, string xml3dRepresentation);
-   [Oneway] void deleteObject(u32 id);
-   [Oneway] void locationUpdate(u32 id, Vec3f position, Quatf rotation, Vec3f scale);
-   // void movementUpdate(u32 id, Vec3f velocity, Vec3f acceleration, Vec3f angularVelocity);
+   [Oneway] void createObject(string uuid, u32 localID, string xml3dRepresentation);
+   [Oneway] void deleteObject(u32[] localId);
+   [Oneway] void locationUpdate(u32 localID, Vec3f position, Quatf rotation, Vec3f scale);
+   // void movementUpdate(string id, Vec3f velocity, Vec3f acceleration, Vec3f angularVelocity);
 }

@@ -8,7 +8,8 @@ struct Quatf {
   float W, Z, X, Y;
 }
 
+// Client-to-server avatar movement synchronization.
 service movement {
    [Oneway] void updateAvatarLocation(string uuid, Vec3f position, Quatf rotation, Vec3f scale);
-   [Oneway] void updateAvatarMovement(string uuid, Vec3f velocity, Vec3f acceleration, Vec3f angularVelocity);
+   // [Oneway] void updateAvatarMovement(string uuid, Vec3f velocity, Vec3f acceleration, Vec3f angularVelocity);
 }

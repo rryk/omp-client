@@ -37,7 +37,7 @@ function(OMP, $, XML3DGraphics) {
     var objects = {};
     var visible = {};
 
-    function handleCreateObject(uuid, xml3d) {
+    function handleCreateObject(id, xml3d, isAgentAvatar) {
         if (objects[uuid] != undefined)
             throw KIARA.Error(KIARA.API_ERROR, "Object with " + uuid + " exists already.");
 
@@ -45,7 +45,7 @@ function(OMP, $, XML3DGraphics) {
         visible[uuid] = false;
     }
 
-    function handleDeleteObject(uuid) {
+    function handleDeleteObject(id) {
         if (objects[uuid] == undefined)
             throw KIARA.Error(KIARA.API_ERROR, "Object with " + uuid + " does not exist.");
 
@@ -55,7 +55,7 @@ function(OMP, $, XML3DGraphics) {
         delete visible[uuid];
     }
 
-    function handleLocationUpdate(uuid, pos, rot, scale) {
+    function handleLocationUpdate(id, pos, rot, scale) {
         if (objects[uuid] == undefined)
             throw KIARA.Error(KIARA.API_ERROR, "Object with " + uuid + " does not exist.");
 
