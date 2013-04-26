@@ -443,6 +443,8 @@
     OMP.ViewerClient.prototype._handleCreateObject = function(uuid, localID, xml3dRepresentation) {
         var self = this;
 
+        logger.info("create object " + localID);
+
         if (self.onCreateObject)
             self.onCreateObject(localID, xml3dRepresentation, uuid == self.agentID);
     }
@@ -458,6 +460,8 @@
 
     OMP.ViewerClient.prototype._handleLocationUpdate = function(localID, position, rotation, scale) {
         var self = this;
+
+        logger.info("location update for " + localID);
 
         if (self.onLocationUpdate) {
             self.onLocationUpdate(
