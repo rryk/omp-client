@@ -1,15 +1,39 @@
 namespace * omp;
 
-struct Vec3f {
+struct UUID {
+  string Guid;
+}
+
+struct Quaternion {
+  float X, Y, Z;  // Imaginative vector.
+  float W;        // Real part.
+}
+
+struct Vector3 {
   float X, Y, Z;
 }
 
-struct Quatf {
-  float W, Z, X, Y;
+struct AgentUpdatePacket_AgentDataBlock {
+  UUID AgentID;               // AgentID returned by the login server.
+  Quaternion BodyRotation;    // Orientation of the avatar body.
+  Vector3 CameraAtAxis;       // X axis of the camera.
+  Vector3 CameraCenter;       // Position of the camera.
+  Vector3 CameraLeftAxis;     // Y axis of the camera.
+  Vector3 CameraUpAxis;       // Z axis of the camera.
+  u32 ControlFlags;           // Various flags related to user controller. Documentation: http://goo.gl/UplNa.
+  float Far;                  // Far rendering plane of the camera.
+  u8 Flags;                   // Currently only used to hide your group title: 0x00 - do not hide, 0x01 - hide.
+  Quaternion HeadRotation;    // Orientation of the avatar head.
+  UUID SessionID;             // SessionID returned passed by the login server.
+  u8 State;                   // Action state of the avatar, which can currently be typing (0x04), editing (0x10) or
+                              // none (0x00)
+}
+
+struct AgentUpdatePacket {
+  AgentUpdatePacket_AgentDataBlock AgentData;
 }
 
 // Client-to-server avatar movement synchronization.
 service movement {
-   [Oneway] void updateAvatarLocation(string uuid, Vec3f position, Quatf rotation, Vec3f scale);
-   // [Oneway] void updateAvatarMovement(string uuid, Vec3f velocity, Vec3f acceleration, Vec3f angularVelocity);
+   [Oneway] void agentUpdate(AgentUpdatePacket packet);
 }
