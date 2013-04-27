@@ -7391,8 +7391,11 @@ XML3D.createClass(XML3D.base.NodeAdapterFactory, XML3D.base.AdapterFactory);
  * @returns {XML3D.base.Adapter} The adapter of the node
  */
 XML3D.base.NodeAdapterFactory.prototype.getAdapter = function(node) {
-    if (!node || node._configured === undefined)
+    if (!node || node._configured === undefined) {
+        XML3D.debug.logWarning("NodeAdapterFactory.prototype.getAdapter: node was not configured");//???DEBUG
         return null;
+    }
+
     var elemHandler = node._configured;
     var key = this.aspect + "_" + this.canvasId;
     var adapter = elemHandler.adapters[key];
@@ -8502,7 +8505,30 @@ XML3D.config.element = function(element, selfmonitoring) {
                 n = n.nextElementSibling;
             }
         }
+    } else {
+        var n = element.firstElementChild;
+        while(n) {
+            if (n._configured === undefined)
+                XML3D.config.element(n, selfmonitoring);
+            n = n.nextElementSibling;
+        }
     }
+
+    if (element._configured) {
+        var n = element.firstElementChild;
+        while(n) {
+            if (n._configured === undefined) {
+                XML3D.debug.logWarning("configured parent, but not configured child");
+                console.log(n); //???DEBUG
+            }
+            n = n.nextElementSibling;
+        }
+    }
+
+    // initialize WebGL
+    XML3D.webgl.element(element);
+
+    // FIXME add here notification for onConfigured event ?
 };
 
 /**
@@ -8670,6 +8696,16 @@ if (navigator.userAgent.indexOf("WebKit") != -1) {
         var parent = e.relatedNode,
         insertedChild = e.target,
         parentHandler = parent._configured;
+
+        if (!parentHandler && insertedChild.localName === "xml3d") {
+            var n = new events.NotificationWrapper(e);
+            XML3D.config.element(insertedChild);
+            n.type = events.NODE_INSERTED;
+            addRecursive(insertedChild);
+            // TODO: Quick fix, solve issue of self monitoring elements better
+            e.stopPropagation();
+            return;
+        }
 
         if(!parentHandler || e.currentTarget === insertedChild)
             return;
@@ -16011,15 +16047,33 @@ XML3D.webgl.MAXFPS = 30;
     };
 
 
+    // FIXME index is not used by createCanvas, seems it is obsolete thus remove it.
+    XML3D.webgl.element = function(xml3d, index) {
+        if (XML3D._native)
+            return;
+        if (xml3d.localName !== "xml3d")
+            return;
+        if (xml3d._configured === undefined)
+            throw new Error("XML3D.webgl.configure can only be called after XML3D.config.configure");
+        if (xml3d._configured.webgl)
+            return;
+        if (!XML3D.webgl.supported())
+            return;
+        if (!xml3d.parentNode || !xml3d.parentNode.ownerDocument)
+            return;
+
+        xml3d._configured.webgl = true;
+
+        // Creates a HTML <canvas> using the style of the <xml3d> Element
+        var canvas = XML3D.webgl.createCanvas(xml3d, index);
+        // Creates the CanvasHandler for the <canvas>  Element
+        var canvasHandler = new XML3D.webgl.CanvasHandler(canvas, xml3d);
+        canvasHandler.tick();
+    }
+
     XML3D.webgl.configure = function(xml3ds) {
-        var handlers = {};
-        for(var i in xml3ds) {
-            // Creates a HTML <canvas> using the style of the <xml3d> Element
-            var canvas = XML3D.webgl.createCanvas(xml3ds[i], i);
-            // Creates the CanvasHandler for the <canvas>  Element
-            var canvasHandler = new XML3D.webgl.CanvasHandler(canvas, xml3ds[i]);
-            handlers[i] = canvasHandler;
-            canvasHandler.tick();
+        for (var i in xml3ds) {
+            XML3D.webgl.element(xml3ds[i], i);
         }
     };
 
