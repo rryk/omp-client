@@ -23,6 +23,24 @@ SOFTWARE.
 
 @version: 4.4
 **/
+// Uses "returnExportsGlobal" pattern from https://github.com/umdjs/umd
+(function (root, factory) {
+    if (typeof exports === 'object') {
+        // Node. Does not work with strict CommonJS, but
+        // only CommonJS-like enviroments that support module.exports,
+        // like Node.
+        module.exports = factory(/*module*/);
+    } else if (typeof define === 'function' && define.amd) {
+        // AMD. Register as an anonymous module.
+        define([/*'module'*/], function (/*module*/) {
+            return (root.XML3D = factory(/*module*/));
+        });
+    } else {
+        // Browser globals
+        root.XML3D = factory(/*root.module*/);
+    }
+}(this, function (/*module*/) {
+
 /** @namespace * */
 var XML3D = XML3D || {};
 
@@ -21411,3 +21429,7 @@ XML3D.shaders.register("pickedNormals", {
 
     uniforms : {}
 });
+
+return XML3D;
+
+}));
