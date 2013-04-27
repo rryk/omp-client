@@ -451,7 +451,7 @@
     OMP.ViewerClient.prototype._handleCreateObject = function(uuid, localID, xml3dRepresentation) {
         var self = this;
 
-        logger.info("create object " + localID);
+        logger.info("create object " + localID + (uuid == self.agentID ? " (avatar)" : ""));
 
         if (self.onCreateObject)
             self.onCreateObject(localID, xml3dRepresentation, uuid == self.agentID);

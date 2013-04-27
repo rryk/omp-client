@@ -188,7 +188,9 @@
     // ====================== XML3DGraphics ========================
 
     // Provides an API to construct and modify an XML3D-based virtual world scene.
-    XML3DGraphics = function() {}
+    XML3DGraphics = function() {
+        this._cameraListener = null;
+    }
 
     // Initializes XML3D scene in the |container|.
     XML3DGraphics.prototype.initScene = /*void*/ function(/*Element*/ container) {
@@ -197,17 +199,93 @@
 //            return;
 //        }
 
+
         this._scene = XML3D.createElement("xml3d");
+        this._scene.setAttribute("id", "sceneRoot");
         this._scene.setAttribute("width", "800");
         this._scene.setAttribute("height", "600");
 
-        var view = XML3D.createElement("view");
-        view.setAttribute("id", "view");
-        view.setAttribute("position", "139.3983917236328 180.59353637695312 39.621944427490234");
-        view.setAttribute("orientation", "-0.05949794501066208 -0.6299545168876648 -0.7743496298789978 3.4618804122460576");
-        this._scene.appendChild(view);
+        this._defs = XML3D.createElement("defs");
+        this._scene.appendChild(this._defs);
+
+        this._cameraXfm = XML3D.createElement("transform");
+        this._cameraXfm.setAttribute("id", "cameraXfm");
+        this._cameraXfm.setAttribute("translation", "139.3983917236328 180.59353637695312 39.621944427490234");
+        this._cameraXfm.setAttribute("rotation", "-0.05949794501066208 -0.6299545168876648 -0.7743496298789978 3.4618804122460576");
+
+        this._defs.appendChild(this._cameraXfm);
+
+        this._viewGroup = XML3D.createElement("group");
+        this._viewGroup.setAttribute("id", "viewGroup");
+        this._viewGroup.setAttribute("transform", "#cameraXfm");
+
+        this._scene.appendChild(this._viewGroup);
+
+        this._view = XML3D.createElement("view");
+        this._view.setAttribute("id", "view");
+        this._viewGroup.appendChild(this._view);
 
         container.appendChild(this._scene);
+
+        // create camera controller
+        //this._sceneController = new XML3D.Xml3dSceneController(this._scene, {mode: "walk", view: this._cameraXfm});
+
+//        var controller = new XMOT.ExamineController(this._viewGroup);
+//        this._scene.addEventListener("mousedown", function(e) {
+//            controller.start({x: e.clientX, y: e.clientY}, e.button == 2 ? XMOT.ExamineController.DOLLY : XMOT.ExamineController.ROTATE);
+//        }, false);
+//        window.addEventListener("mouseup", function() {
+//            controller.stop();
+//        }, false);
+//        window.addEventListener("mousemove", function(e) {
+//            controller.doAction({x: e.clientX, y: e.clientY});
+//        }, false);
+
+        var controller = new XMOT.CameraController("viewGroup", "sceneRoot", null, false);
+        controller.activate();
+
+        var that = this;
+        this._cameraXfm.addEventListener("DOMAttrModified", function (ev) {
+            if (that._cameraListener) {
+                that._cameraListener(that.getCameraPosition(), that.getCameraRotation());
+            }
+        }, false);
+
+//        this._scene.addEventListener("mousedown", function(e) {
+//            controller.start({x: e.clientX, y: e.clientY}, e.button == 2 ? XMOT.ExamineController.DOLLY : XMOT.ExamineController.ROTATE);
+//        }, false);
+//        window.addEventListener("mouseup", function() {
+//            controller.stop();
+//        }, false);
+//        window.addEventListener("mousemove", function(e) {
+//            controller.doAction({x: e.clientX, y: e.clientY});
+//        }, false);
+    }
+
+    XML3DGraphics.prototype.setCameraListener = function(listener) {
+        this._cameraListener = listener;
+    }
+
+    XML3DGraphics.prototype.getCameraPosition = function() {
+        return {x: this._cameraXfm.translation.x,
+                y: this._cameraXfm.translation.y,
+                z: this._cameraXfm.translation.z};
+    }
+
+    XML3DGraphics.prototype.getCameraRotation = function() {
+        var quat = this._cameraXfm.rotation.getQuaternion();
+        return {x: quat[0], y: quat[1], z:quat[2], w:quat[3]};
+    }
+
+    XML3DGraphics.prototype.setCameraLocation = function(position, rotation) {
+        if (position) {
+            this._cameraXfm.translation.x = position.x;
+            this._cameraXfm.translation.y = position.y;
+            this._cameraXfm.translation.z = position.z;
+        }
+        if (rotation) {
+            this._cameraXfm.rotation.setQuaternion(new XML3DVec3(rotation.x, rotation.y, rotation.z), rotation.w);
+        }
     }
 
     // Constructs a new MeshObject constructed from |index| and |pos| arrays.

@@ -1,13 +1,26 @@
+    logger.activate(false);
     var xml3dGraphics = new XML3DGraphics();
+
+
 
     var objects = {};
     var visible = {};
+    var avatarObject = null;
+
+    function handleCameraMovement(position, rotation) {
+        console.log(position);
+        console.log(rotation);
+    }
+    xml3dGraphics.setCameraListener(handleCameraMovement);
 
     function handleCreateObject(id, xml3d, isAgentAvatar) {
         if (objects[id] != undefined)
             throw new KIARA.Error(KIARA.API_ERROR, "Object with " + id + " exists already.");
 
-        objects[id] = xml3dGraphics.createSimpleObject(id, xml3d);
+        var object = xml3dGraphics.createSimpleObject(id, xml3d);
+        objects[id] = object;
+        if (isAgentAvatar)
+            avatarObject = object;
         visible[id] = false;
     }
 
@@ -25,7 +38,14 @@
         if (objects[id] == undefined)
             throw new KIARA.Error(KIARA.API_ERROR, "Object with " + id + " does not exist.");
 
-        objects[id].setLocation(pos, rot, scale);
+        var object = objects[id];
+        object.setLocation(pos, rot, scale);
+
+        if (avatarObject === object) {
+            console.log(pos);
+            console.log(rot);
+            //xml3dGraphics.setCameraLocation(pos, rot); // FIXME: do this only once ?
+        }
 
         if (!visible[id]) {
             xml3dGraphics.addSimpleObject(objects[id]);
