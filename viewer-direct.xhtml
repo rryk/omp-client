@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+          "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd" >
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>OMP Client</title>
+
+    <script type="text/javascript" src="scripts/lib/md5.js"></script>
+    <script type="text/javascript">
+        var md5 = {hex_md5 : hex_md5 };
+    </script>
+    <script type="text/javascript" src="scripts/lib/base64.js"></script>
+    <script type="text/javascript" src="scripts/lib/logger.js"></script>
+    <script type="text/javascript" src="scripts/lib/jquery.js"></script>
+
+    <script type="text/javascript" src="scripts/lib/kiara.js"></script>
+
+    <script type="text/javascript" src="scripts/lib/xml3d.js"></script>
+    <script type="text/javascript" src="scripts/lib/xml3d-camera.js"></script>
+    <script type="text/javascript" src="scripts/lib/eyelightShader.js"></script>
+
+    <script type="text/javascript" src="scripts/omp/omp.js"></script>
+    <script type="text/javascript" src="scripts/omp/xml3d-gfx.js"></script>
+</head>
+<body>
+    <div id="loginForm">
+        <label for="firstname">First name:</label><input id="firstname" value="Test"/> <br/>
+        <label for="lastname">Last name:</label><input id="lastname" value="User"/> <br/>
+        <label for="pass">Password:</label><input type="password" id="pass" value="123"/> <br/>
+        <button id="loginBtn" disabled="disabled">Login</button>
+    </div>
+    <div id="viewerInterface" style="display: none"></div>
+
+    <script type="text/javascript" src="scripts/viewer-direct.js"></script>
+</body>
+</html>

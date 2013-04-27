@@ -200,8 +200,14 @@
         this._scene = XML3D.createElement("xml3d");
         this._scene.setAttribute("width", "800");
         this._scene.setAttribute("height", "600");
+
+        var view = XML3D.createElement("view");
+        view.setAttribute("id", "view");
+        view.setAttribute("position", "139.3983917236328 180.59353637695312 39.621944427490234");
+        view.setAttribute("orientation", "-0.05949794501066208 -0.6299545168876648 -0.7743496298789978 3.4618804122460576");
+        this._scene.appendChild(view);
+
         container.appendChild(this._scene);
-        XML3D.webgl.configure([this._scene]);
     }
 
     // Constructs a new MeshObject constructed from |index| and |pos| arrays.
