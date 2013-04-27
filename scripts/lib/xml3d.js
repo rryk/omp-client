@@ -112,7 +112,11 @@ XML3D.createClass = function(ctor, parent, methods) {
 };
 
 (function() {
+    XML3D._initialized = false;
     var onload = function() {
+        if (XML3D._initialized)
+            return;
+        XML3D._initialized = true;
 
         XML3D.css.init();
 
@@ -204,6 +208,9 @@ XML3D.createClass = function(ctor, parent, methods) {
         if (XML3D.document)
             XML3D.document.onunload();
     };
+
+    XML3D._initialize = onload;
+
     window.addEventListener('DOMContentLoaded', onload, false);
     window.addEventListener('unload', onunload, false);
     window.addEventListener('reload', onunload, false);
@@ -21429,6 +21436,14 @@ XML3D.shaders.register("pickedNormals", {
 
     uniforms : {}
 });
+
+
+if (document.readyState == "complete"
+    || document.readyState == "loaded"
+    || document.readyState == "interactive") {
+    // document has at least been parsed
+    XML3D._initialize();
+}
 
 return XML3D;
 
