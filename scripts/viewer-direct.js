@@ -5,7 +5,7 @@
 
     function handleCreateObject(id, xml3d, isAgentAvatar) {
         if (objects[id] != undefined)
-            throw KIARA.Error(KIARA.API_ERROR, "Object with " + id + " exists already.");
+            throw new KIARA.Error(KIARA.API_ERROR, "Object with " + id + " exists already.");
 
         objects[id] = xml3dGraphics.createSimpleObject(id, xml3d);
         visible[id] = false;
@@ -13,7 +13,7 @@
 
     function handleDeleteObject(id) {
         if (objects[id] == undefined)
-            throw KIARA.Error(KIARA.API_ERROR, "Object with " + id + " does not exist.");
+            throw new KIARA.Error(KIARA.API_ERROR, "Object with " + id + " does not exist.");
 
         xml3dGraphics.removeSimpleObject(objects[id]);
 
@@ -23,7 +23,7 @@
 
     function handleLocationUpdate(id, pos, rot, scale) {
         if (objects[id] == undefined)
-            throw KIARA.Error(KIARA.API_ERROR, "Object with " + id + " does not exist.");
+            throw new KIARA.Error(KIARA.API_ERROR, "Object with " + id + " does not exist.");
 
         objects[id].setLocation(pos, rot, scale);
 
