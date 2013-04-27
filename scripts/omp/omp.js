@@ -428,8 +428,16 @@
 
     // User handlers may be passed to the constructor. The signatures for them are:
     //   onCreateObject(id, xml3dRepresentation, isAgentAvatar)
+    //     id - unique ID for the object
+    //     xml3dRepresentation - string with XML3D object representation
+    //     isAgentAvatar - whether this object represents user's avatar
     //   onDeleteObject(id)
+    //     id - unique ID for the object
     //   onLocationUpdate(id, pos, rot, scale)
+    //     id - unique ID for the object
+    //     pos - an object with x, y and z properties (vector)
+    //     rot - an object with w, x, y and z properties (quaternion)
+    //     scale - an object with x, y and z properties (vector)
     OMP.ViewerClient = function(onCreateObject, onDeleteObject, onLocationUpdate) {
         var self = this;
 
