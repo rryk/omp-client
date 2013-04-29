@@ -12,6 +12,8 @@
             throw new KIARA.Error(KIARA.API_ERROR, "Object with " + id + " exists already.");
 
         var object = xml3dGraphics.createSimpleObject(id, xml3d);
+        xml3dGraphics.addSimpleObject(object);
+
         objects[id] = object;
         if (isAgentAvatar)
             avatarObject = object;
@@ -42,7 +44,7 @@
         }
 
         if (!visible[id]) {
-            xml3dGraphics.addSimpleObject(objects[id]);
+            objects[id].setVisible(true);
             visible[id] = true;
         }
     }

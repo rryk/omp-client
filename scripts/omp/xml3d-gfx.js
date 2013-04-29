@@ -71,10 +71,21 @@
         this._transform = XML3D.createElement("transform");
         this._transform.setAttribute("id", transformID);
         this._group.setAttribute("transform", "#" + transformID);
+        this._group.setAttribute("visible", "false");
     }
     util.inherits(XML3DSimpleObject, XML3DObject);
 
+    XML3DSimpleObject.prototype.isVisible = function() {
+        return this._group.parentElement && this._group.visible;
+    }
+
+    XML3DSimpleObject.prototype.setVisible = function(flag) {
+        this._group.setAttribute("visible", flag ? "true" : "false");
+    }
+
     XML3DSimpleObject.prototype.addToScene = function(scene) {
+        if (this._group.parentElement)
+            return;
         var defs = scene.getElementsByTagName("defs");
         if (defs.length == 0) {
             defs = XML3D.createElement("defs");
