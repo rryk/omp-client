@@ -7,12 +7,6 @@
     var visible = {};
     var avatarObject = null;
 
-    function handleCameraMovement(position, rotation) {
-        console.log(position);
-        console.log(rotation);
-    }
-    xml3dGraphics.setCameraListener(handleCameraMovement);
-
     function handleCreateObject(id, xml3d, isAgentAvatar) {
         if (objects[id] != undefined)
             throw new KIARA.Error(KIARA.API_ERROR, "Object with " + id + " exists already.");
@@ -42,8 +36,8 @@
         object.setLocation(pos, rot, scale);
 
         if (avatarObject === object) {
-            console.log(pos);
-            console.log(rot);
+            //console.log(pos);
+            //console.log(rot);
             //xml3dGraphics.setCameraLocation(pos, rot); // FIXME: do this only once ?
         }
 
@@ -53,6 +47,17 @@
         }
     }
 
+    function handleCameraMovement(client, position, rotation) {
+        client.setViewerState(position, rotation,
+            {x: 0, y:1, z:0}, // camera up
+            {x: 0, y:-1, z:0}, // camera left
+            {x: 0, y: 0, z:1}, // camera at
+            null
+        );
+        console.log("VIEWER POS XYZ ", position.x, position.y, position.z);
+        console.log("VIEWER ROT XYZW ", rotation.x, rotation.y, rotation.z, rotation.w);
+    }
+
     $("#loginBtn").click(function() {
         var client = new OMP.ViewerClient(handleCreateObject, handleDeleteObject, handleLocationUpdate);
         client.login($("#firstname").val(), $("#lastname").val(), $("#pass").val(), function() {
@@ -60,6 +65,7 @@
                 $("#loginForm").hide();
                 $("#viewerInterface").show();
                 xml3dGraphics.initScene($("#viewerInterface")[0]);
+                xml3dGraphics.setCameraListener(handleCameraMovement.bind(window, client));
             });
         });
     });
