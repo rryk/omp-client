@@ -35,7 +35,8 @@
             throw new KIARA.Error(KIARA.API_ERROR, "Object with " + id + " does not exist.");
 
         var object = objects[id];
-        object.setLocation(pos, rot, scale);
+        // passed scale is of the bounding box
+        object.setLocation(pos, rot, null, scale);
 
         if (avatarObject === object) {
             //console.log(pos);
