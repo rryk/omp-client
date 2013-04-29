@@ -515,6 +515,10 @@
     OMP.ViewerClient.prototype.setViewerState = /*void*/ function(position, rotation, cameraUp,
                                                                   cameraLeft, cameraAt, controls) {
         var self = this;
+        if (self.tooFastStateUpdates)
+          return;
+
+        self.tooFastStateUpdates = true;
 
         if (!controls)
           controls = 0;
@@ -535,6 +539,8 @@
                 State: 0
             }
         });
+
+        setTimeout(function() { self.tooFastStateUpdates = false }, 100);
     }
 
     return OMP;
