@@ -18663,13 +18663,18 @@ Renderer.prototype.sceneTreeAddition = function(evt) {
 
     var parentNode = target.parentElement;
     var parentTransform = XML3D.math.mat4.identity(XML3D.math.mat4.create());
-    if(parentNode && parentNode.nodeName == "group")
+    if (parentNode)
     {
-        var parentAdapter = this.getAdapter(parentNode);
-        parentTransform = parentAdapter.applyTransformMatrix(parentTransform);
-        if (!shaderHandle)
-		shaderHandle = parentAdapter.getShaderHandle();
-		visible = parentNode.visible && parentAdapter.parentVisible;
+        if (parentNode.nodeName == "group") {
+            var parentAdapter = this.getAdapter(parentNode);
+            parentTransform = parentAdapter.applyTransformMatrix(parentTransform);
+            if (!shaderHandle)
+                shaderHandle = parentAdapter.getShaderHandle();
+            visible = parentNode.visible && parentAdapter.parentVisible;
+        } else if (parentNode.nodeName === "xml3d") {
+            // xml3d root is always visible
+            visible = true;
+        }
     }
 
     //Build any new objects and add them to the scene
