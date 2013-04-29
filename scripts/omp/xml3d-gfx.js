@@ -64,7 +64,8 @@
         if (typeof(xml3dRepresentation) == "string") {
             var parsedXML3DDocument = (new DOMParser()).parseFromString(
                 xml3dRepresentation, "application/xml");
-            this._group.appendChild(parsedXML3DDocument.documentElement);
+            this._model = parsedXML3DDocument.documentElement;
+            this._group.appendChild(this._model);
         }
 
         var transformID = "transform" + XML3DObject.generateID();
@@ -81,7 +82,7 @@
 
     XML3DSimpleObject.prototype._bboxNotEmpty = function() {
         if (this._bboxScale) {
-            this._setBBoxScale(this._bboxScale);
+            this._setModelBBoxScale(this._bboxScale);
             this._bboxScale = null;
         }
     }
@@ -130,12 +131,8 @@
             this._transform.scale.z = scale.z;
         }
         if (bboxScale) {
-            if (!this.getBoundingBox().isEmpty()) {
-                this._setBBoxScale(bboxScale);
-                var bboxSize = object.getBoundingBox().size();
-                this._transform.scale.x = bboxScale.x / bboxSize.x;
-                this._transform.scale.y = bboxScale.y / bboxSize.y;
-                this._transform.scale.z = bboxScale.z / bboxSize.z;
+            if (!this.getModelBoundingBox().isEmpty()) {
+                this._setModelBBoxScale(bboxScale);
             } else {
                 // bbox is empty, do it when bbox is available
                 this._bboxScale = bboxScale;
@@ -143,8 +140,8 @@
         }
     }
 
-    XML3DSimpleObject.prototype._setBBoxScale = function(bboxScale) {
-        var bboxSize = this.getBoundingBox().size();
+    XML3DSimpleObject.prototype._setModelBBoxScale = function(bboxScale) {
+        var bboxSize = this.getModelBoundingBox().size();
         this._transform.scale.x = bboxScale.x / bboxSize.x;
         this._transform.scale.y = bboxScale.y / bboxSize.y;
         this._transform.scale.z = bboxScale.z / bboxSize.z;
@@ -152,6 +149,10 @@
 
     XML3DSimpleObject.prototype.getBoundingBox = function() {
         return this._group.getBoundingBox();
+    }
+
+    XML3DSimpleObject.prototype.getModelBoundingBox = function() {
+        return this._model.getBoundingBox();
     }
 
     // ====================== XML3DMeshObject ========================
