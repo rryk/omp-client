@@ -251,7 +251,6 @@
 //            return;
 //        }
 
-
         this._scene = XML3D.createElement("xml3d");
         this._scene.setAttribute("id", "sceneRoot");
         this._scene.setAttribute("width", "800");
@@ -276,6 +275,15 @@
         this._view = XML3D.createElement("view");
         this._view.setAttribute("id", "view");
         this._viewGroup.appendChild(this._view);
+
+        // FIXME: this should be done on response to LayerData message, but we just hardcode flat
+        // terrain at height 22.
+        this._terrain = (new DOMParser()).parseFromString(
+          "<group id='terrain' shader='xml3d/terrain/terrain.xml#terrainShader'" +
+          "                    transform='xml3d/terrain/terrain.xml#terrainTransform'>" +
+          "  <mesh src='xml3d/terrain/terrain.xml#terrainData' />" +
+          "</group>", "application/xml").documentElement;
+        this._scene.appendChild(this._terrain);
 
         container.appendChild(this._scene);
 
