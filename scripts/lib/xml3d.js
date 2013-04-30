@@ -8507,9 +8507,8 @@ XML3D.config.element = function(element, selfmonitoring) {
         }
     } else {
         var n = element.firstElementChild;
-        while(n) {
-            if (n._configured === undefined)
-                XML3D.config.element(n, selfmonitoring);
+        while (n) {
+            XML3D.config.element(n, selfmonitoring);
             n = n.nextElementSibling;
         }
     }
