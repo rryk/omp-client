@@ -102,6 +102,7 @@
             defs = defs[0];
         }
 
+        defs.appendChild(this._modelTransform);
         defs.appendChild(this._transform);
         scene.appendChild(this._group);
         if (this._bboxCB) {
@@ -120,31 +121,46 @@
         this._transform.parentNode.removeChild(this._transform);
     }
 
-    XML3DSimpleObject.prototype.setLocation = function(position, rotation, scale, bboxScale) {
+    XML3DSimpleObject.prototype.setLocation = function(position, rotation, scale) {
         this._transform.translation.x = position.x;
         this._transform.translation.y = position.y;
         this._transform.translation.z = position.z;
         this._transform.rotation.setQuaternion(new XML3DVec3(rotation.x, rotation.y, rotation.z), rotation.w);
-        if (scale) {
-            this._transform.scale.x = scale.x;
-            this._transform.scale.y = scale.y;
-            this._transform.scale.z = scale.z;
-        }
-        if (bboxScale) {
-            if (!this.getModelBoundingBox().isEmpty()) {
-                this._setModelBBoxScale(bboxScale);
-            } else {
-                // bbox is empty, do it when bbox is available
-                this._bboxScale = bboxScale;
-            }
-        }
+        this._transform.scale.x = scale.x;
+        this._transform.scale.y = scale.y;
+        this._transform.scale.z = scale.z;
     }
 
-    XML3DSimpleObject.prototype._setModelBBoxScale = function(bboxScale) {
-        var bboxSize = this.getModelBoundingBox().size();
-        this._transform.scale.x = bboxScale.x / bboxSize.x;
-        this._transform.scale.y = bboxScale.y / bboxSize.y;
-        this._transform.scale.z = bboxScale.z / bboxSize.z;
+    XML3DSimpleObject.prototype.setBBoxLocation = function(bboxPosition, bboxRotation, bboxScale) {
+        this._setModelBBoxTransform(bboxPosition, bboxRotation, bboxScale);
+    }
+
+    XML3DSimpleObject.prototype._setModelBBoxTransform = function(bboxPosition, bboxRotation, bboxScale) {
+        if (this.getModelBoundingBox().isEmpty()) {
+            // bbox is empty, do it when bbox is available
+            this._bboxPosition = bboxPosition;
+            this._bboxRotation = bboxRotation;
+            this._bboxScale = bboxScale;
+        } else {
+            var bboxSize = this.getModelBoundingBox().size();
+            this._modelTransform.translation.z = -bboxSize.z / 2.0;
+            if (bboxPosition) {
+                this._transform.translation.x = bboxPosition.x;
+                this._transform.translation.y = bboxPosition.y;
+                this._transform.translation.z = bboxPosition.z;
+            }
+            if (bboxRotation) {
+                this._transform.rotation.setQuaternion(
+                    new XML3DVec3(bboxRotation.x, bboxRotation.y, bboxRotation.z), bboxRotation.w);
+            }
+            if (bboxScale) {
+                this._transform.scale.x = bboxScale.x / bboxSize.x;
+                this._transform.scale.y = bboxScale.y / bboxSize.y;
+                this._transform.scale.z = bboxScale.z / bboxSize.z;
+                this._transform.center.z = +bboxScale.z / 2.0;
+                //console.log("NEW SCALE "+this._transform.scale.x+" "+this._transform.scale.y+" "+this._transform.scale.z);
+            }
+        }
     }
 
     XML3DSimpleObject.prototype.getBoundingBox = function() {

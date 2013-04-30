@@ -16046,6 +16046,13 @@ XML3D.webgl.MAXFPS = 30;
     };
 
 
+//    function getWebglSceneRoot(element) {
+//        var xml3d = element;
+//        while (xml3d.localName != "xml3d" && xml3d.parentNode)
+//            xml3d = xml3d.parentNode;
+//        return xml3d && xml3d.localName == "xml3d" ? xml3d : null;
+//    }
+//
     // FIXME index is not used by createCanvas, seems it is obsolete thus remove it.
     XML3D.webgl.element = function(xml3d, index) {
         if (XML3D._native)
@@ -21496,6 +21503,10 @@ XML3D.shaders.register("pickedNormals", {
 
     uniforms : {}
 });
+
+// Cleanup
+exports = undefined;
+delete exports;
 
 
 if (document.readyState == "complete"

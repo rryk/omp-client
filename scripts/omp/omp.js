@@ -451,7 +451,7 @@
     OMP.ViewerClient.prototype._handleCreateObject = function(uuid, localID, xml3dRepresentation) {
         var self = this;
 
-        logger.info("create object " + localID + (uuid == self.agentID ? " (avatar)" : ""));
+        logger.info("create object " + localID + (uuid == self.agentID ? " (avatar)" : "") + " uuid="+uuid.Guid);
 
         if (self.onCreateObject)
             self.onCreateObject(localID, xml3dRepresentation, uuid == self.agentID);
@@ -469,7 +469,10 @@
     OMP.ViewerClient.prototype._handleLocationUpdate = function(localID, position, rotation, scale) {
         var self = this;
 
-        logger.info("location update for " + localID);
+        logger.info("location update for " + localID +
+            "\n(position XYZ "+position.X+" "+position.Y+" "+position.Z+")"+
+            "\n(rotation XYZW "+rotation.X+" "+rotation.Y+" "+rotation.Z+" "+rotation.W+") "+
+            "\n(scale XYZ "+scale.X+" "+scale.Y+" "+scale.Z+")");
 
         if (self.onLocationUpdate) {
             self.onLocationUpdate(
