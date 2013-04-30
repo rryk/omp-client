@@ -150,8 +150,25 @@
             this._bboxRotation = bboxRotation;
             this._bboxScale = bboxScale;
         } else {
-            var bboxSize = this.getModelBoundingBox().size();
-            this._modelTransform.translation.z = -bboxSize.z / 2.0;
+            var bbox = this.getModelBoundingBox();
+            var bboxSize = bbox.size();
+
+            console.log(
+                "ID "+this._id+" GET POS.Z "+bboxPosition.z+" DIFF TO GROUND "+(bboxPosition.z-22)+"\n"+
+                " APPROX OMP MODEL HEIGHT "+((bboxPosition.z-22)/bboxScale.z)+"\n"+
+                "SCALE Z "+bboxScale.z+" SCALE Z/2 "+(bboxScale.z/2)+" MODEL BBOX SIZE Z "+bboxSize.z+"\n"+
+                " MODEL BBOX MIN Z "+bbox.min.z+" MODEL BBOX MAX Z "+bbox.max.z);
+
+            this._modelTransform.scale.x = 1 / bboxSize.x;
+            this._modelTransform.scale.y = 1 / bboxSize.y;
+            this._modelTransform.scale.z = 1 / bboxSize.z;
+            this._modelTransform.center.x = bbox.min.x;
+            this._modelTransform.center.y = bbox.min.y;
+            this._modelTransform.center.z = bbox.min.z;
+            this._modelTransform.translation.x = -bbox.min.x-0.5;
+            this._modelTransform.translation.y = -bbox.min.y-0.5;
+            this._modelTransform.translation.z = -bbox.min.z-0.5;
+
             if (bboxPosition) {
                 this._transform.translation.x = bboxPosition.x;
                 this._transform.translation.y = bboxPosition.y;
@@ -162,10 +179,9 @@
                     new XML3DVec3(bboxRotation.x, bboxRotation.y, bboxRotation.z), bboxRotation.w);
             }
             if (bboxScale) {
-                this._transform.scale.x = bboxScale.x / bboxSize.x;
-                this._transform.scale.y = bboxScale.y / bboxSize.y;
-                this._transform.scale.z = bboxScale.z / bboxSize.z;
-                this._transform.center.z = +bboxScale.z / 2.0;
+                this._transform.scale.x = bboxScale.x;
+                this._transform.scale.y = bboxScale.y;
+                this._transform.scale.z = bboxScale.z;
                 //console.log("NEW SCALE "+this._transform.scale.x+" "+this._transform.scale.y+" "+this._transform.scale.z);
             }
         }
