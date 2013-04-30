@@ -36,7 +36,7 @@
 
         var object = objects[id];
         // passed scale is of the bounding box
-        object.setLocation(pos, rot, null, scale);
+        object.setBBoxLocation(pos, rot, scale);
 
         if (avatarObject === object) {
             //console.log(pos);

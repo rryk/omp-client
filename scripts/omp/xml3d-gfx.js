@@ -61,11 +61,18 @@
         this._group = XML3D.createElement("group");
         this._group.setAttribute("id", this.id());
 
+        this._modelGroup = XML3D.createElement("group");
+        var modelTransformID = "transform" + XML3DObject.generateID();
+        this._modelTransform = XML3D.createElement("transform");
+        this._modelTransform.setAttribute("id", modelTransformID);
+        this._modelGroup.setAttribute("transform", "#"+modelTransformID);
+
         if (typeof(xml3dRepresentation) == "string") {
             var parsedXML3DDocument = (new DOMParser()).parseFromString(
                 xml3dRepresentation, "application/xml");
+
             this._model = parsedXML3DDocument.documentElement;
-            this._group.appendChild(this._model);
+            this._modelGroup.appendChild(this._model);
         }
 
         var transformID = "transform" + XML3DObject.generateID();
@@ -73,6 +80,7 @@
         this._transform.setAttribute("id", transformID);
         this._group.setAttribute("transform", "#" + transformID);
         this._group.setAttribute("visible", "false");
+        this._group.appendChild(this._modelGroup);
     }
     util.inherits(XML3DSimpleObject, XML3DObject);
 
@@ -81,10 +89,10 @@
     }
 
     XML3DSimpleObject.prototype._bboxNotEmpty = function() {
-        if (this._bboxScale) {
-            this._setModelBBoxScale(this._bboxScale);
-            this._bboxScale = null;
-        }
+        this._setModelBBoxTransform(this._bboxPosition, this._bboxRotation, this._bboxScale);
+        this._bboxPosition = null;
+        this._bboxRotation = null;
+        this._bboxScale = null;
     }
 
     XML3DSimpleObject.prototype.setVisible = function(flag) {
