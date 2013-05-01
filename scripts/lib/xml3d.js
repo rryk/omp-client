@@ -19603,9 +19603,12 @@ Renderer.prototype.notifyDataChanged = function() {
             so = n.scaleOrientation.toMatrix()._data,
             rot = n.rotation.toMatrix()._data;
 
+        var invCenterVec = XML3D.math.vec3.create();
+        XML3D.math.vec3.negate(invCenterVec, centerVec);
+
         XML3D.math.mat4.translate(transform.translate, IDENT_MAT, transVec);
         XML3D.math.mat4.translate(transform.center, IDENT_MAT, centerVec);
-        XML3D.math.mat4.translate(transform.centerInverse, IDENT_MAT, XML3D.math.vec3.negate(centerVec, centerVec));
+        XML3D.math.mat4.translate(transform.centerInverse, IDENT_MAT, invCenterVec);
         XML3D.math.mat4.scale(transform.scale, IDENT_MAT, s);
         XML3D.math.mat4.invert(transform.scaleOrientationInv, so);
 
