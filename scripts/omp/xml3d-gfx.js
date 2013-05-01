@@ -153,6 +153,20 @@
             var bbox = this.getModelBoundingBox();
             var bboxSize = bbox.size();
 
+            xyzToString = function xyzToString(xyz) {
+                return "[" + xyz.x + "," + xyz.y + "," + xyz.z + "]";
+            }
+
+            arrayToString = function arrayToString(xyz) {
+                return "[" + xyz[0] + "," + xyz[1] + "," + xyz[2] + "]";
+            }
+
+            boxToString = function boxToString(box) {
+                return "Box(min=" + xyzToString(box.min) + ", max=" + xyzToString(box.max) + ")";
+            }
+
+            console.log("MODEL BBOX "+boxToString(bbox));
+
             console.log(
                 "ID "+this._id+" GET POS.Z "+bboxPosition.z+" DIFF TO GROUND "+(bboxPosition.z-22)+"\n"+
                 " APPROX OMP MODEL HEIGHT "+((bboxPosition.z-22)/bboxScale.z)+"\n"+
