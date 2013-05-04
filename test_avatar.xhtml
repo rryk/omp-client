@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd" >
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <title>Test</title>
+    <script type="text/javascript" src="scripts/lib/xml3d.js"></script>
+    <!--<script type="text/javascript" src="scripts/lib/xml3d-camera.js"></script>-->
+    <script type="text/javascript" src="scripts/lib/xml3d-motion.js"></script>
+
+    <script type="text/javascript" src="scripts/lib/eyelightShader.js"></script>
+    <script type="text/javascript" src="scripts/lib/shaders.js"></script>
+
+    <script type="text/javascript">
+    <![CDATA[
+
+        (function () {
+
+            var Animator = function () {
+                this.startTime = Date.now();
+                this.lastTime = Date.now();
+                this.animations = [];
+                //this.animations.push({ step:0, maxStep:37, duration:25000, element:"watchmen_animation" });
+                //this.animations.push({ step:0, maxStep:40, duration:28600, element:"natalie_walking_animation" });
+                this.animations.push({ step:0, maxStep:2, duration:1430, element:"natalie_walking_animation" });
+                //this.animations.push({ step:0, maxStep:7.1, duration:5000, element:"natalie_sitting_animation" });
+                //this.animations.push({ step:0, maxStep:37, duration:25000, element:"male_standing_animation" });
+                /*
+                 this.animations.push({ step: 0, maxStep: 40, offset: 0, duration: 28600, element: "natalie_animation_weight1" });
+                 this.animations.push({ step: 0, maxStep: 40, offset: 2500, duration: 28600, element: "natalie_animation_weight2" });
+                 this.animations.push({ step: 0, maxStep: 40, offset: 5000, duration: 28600, element: "natalie_animation_weight3" });
+                 this.animations.push({ step: 0, maxStep: 40, offset: 7500, duration: 28600, element: "natalie_animation_weight4" });
+                 this.animations.push({ step: 0, maxStep: 40, offset: 10000, duration: 28600, element: "natalie_animation_weight5" });
+                 this.animations.push({ step: 0, maxStep: 40, offset: 12500, duration: 28600, element: "natalie_animation_weight6" });
+                 this.animations.push({ step: 0, maxStep: 40, offset: 15000, duration: 28600, element: "natalie_animation_weight7" });
+                 this.animations.push({ step: 0, maxStep: 40, offset: 17500, duration: 28600, element: "natalie_animation_weight8" });
+                 */
+
+            }, m = Animator.prototype;
+
+            var requestAnimationFrame =
+                    window.requestAnimationFrame ||
+                            window.webkitRequestAnimationFrame ||
+                            window.mozRequestAnimationFrame ||
+                            window.oRequestAnimationFrame ||
+                            window.msRequestAnimationFrame;
+
+
+            m.init = function () {
+                var that = this;
+                for (var i = 0; i < this.animations.length; i++) {
+                    this.animations[i].param = document.getElementById(this.animations[i].element);
+                }
+                var myxml3d = document.getElementById("sceneRoot");
+
+                requestAnimationFrame(museumsLoop.bind(this));
+            };
+
+            function museumsLoop() {
+                this.update();
+                requestAnimationFrame(museumsLoop.bind(this));
+            }
+
+            m.update = function () {
+                var elapsed = Date.now() - this.startTime;
+                var delta = Date.now() - this.lastTime;
+                this.lastTime = Date.now();
+
+                var animationCount = this.animations.length;
+                for (var i = 0; i < animationCount; i++) {
+                    var anim = this.animations[i];
+                    if (anim.param) {
+                        var fac = ((elapsed + (anim.offset || 0)) % anim.duration) / anim.duration;
+                        anim.step = fac * anim.maxStep;
+                        anim.param.textContent = anim.step;
+                    }
+                }
+            }
+
+            m.restartAnimation = function () {
+                this.startTime = Date.now();
+                this.lastTime = Date.now();
+            }
+
+            window.addEventListener('load', function() {
+                window.animator = new Animator();
+                animator.init();
+            });
+        })();
+
+        window.addEventListener('load', function () {
+            var controller = new XMOT.ExamineController(document.getElementById("viewGroup"),
+                    {revolveAroundPoint:new XML3DVec3(140.07481384277344, 138.0287628173828, 24.64005470275879), dollySpeed:10, sceneRadius:365});
+            var xml3d = document.getElementById("sceneRoot");
+            xml3d.addEventListener("mousedown", function (e) {
+                controller.start({x:e.clientX, y:e.clientY}, e.button == 2 ? XMOT.ExamineController.DOLLY : XMOT.ExamineController.ROTATE);
+            }, false);
+            window.addEventListener("mouseup", function () {
+                controller.stop();
+            }, false);
+            window.addEventListener("mousemove", function (e) {
+                controller.doAction({x:e.clientX, y:e.clientY});
+            }, false);
+        }, false);
+    ]]>
+    </script>
+
+</head>
+
+<body>
+<xml3d xmlns="http://www.xml3d.org/2009/xml3d" id="sceneRoot" width="800" height="600" activeView="#view">
+    <defs>
+        <transform id="cameraXfm" translation="140.07481384277344 138.0287628173828 24.64005470275879"
+                   rotation="0.43035098910331726 -0.5479759573936462 -0.7173007726669312 2.514564450276584"/>
+        <transform id="transform0" translation="0 0 -1.3946547508239746"
+                   scale="0.12662063539028168 0.04762310907244682 0.11519449949264526"/>
+        <transform id="transform1" translation="129.4309539794922 135.23915100097656 24.135854721069336"
+                   rotation="0 0 1 0" scale="3.7708170413970947 10.025870323181152 4.144842147827148"/>
+        <transform id="transform2" translation="0 0 -1.3946547508239746"
+                   scale="0.12662063539028168 0.04762310907244682 0.11519449949264526"/>
+        <transform id="transform3" translation="139.52899169921875 131.9105987548828 24.145858764648438"
+                   rotation="0 0 -0.9999996423721313 0.5235989787445808"
+                   scale="3.7708170413970947 10.025870323181152 4.144842147827148"/>
+        <transform id="transform4" translation="0 0 -1.3946547508239746"
+                   scale="0.12662063539028168 0.04762310907244682 0.11519449949264526"/>
+        <transform id="transform5" translation="140.39468383789062 145.0238800048828 24.90052604675293"
+                   rotation="0 0 -0.9999998211860657 0.4014257743134858"
+                   scale="5.335693836212158 14.18657398223877 5.864937782287598"/>
+        <transform id="transform6" translation="0 0 -0.00003910064697265625"
+                   scale="0.49295666813850403 0.14917410910129547 0.12209980189800262"/>
+        <transform id="transform7" translation="144.26663208007812 136.04307556152344 23.65519142150879"
+                   rotation="0 0 1 2.5787399440225203" scale="0.7890334725379944 2.607440233230591 3.1856095790863037"/>
+        <transform id="transform8"/>
+        <transform id="transform9"/>
+    </defs>
+    <group id="viewGroup" transform="#cameraXfm">
+        <view id="view"/>
+    </group>
+    <group id="terrain" shader="xml3d/terrain/terrain.xml#terrainShader"
+           transform="xml3d/terrain/terrain.xml#terrainTransform">
+        <mesh src="xml3d/terrain/terrain.xml#terrainData"/>
+    </group>
+
+    <!-- Natalie -->
+
+    <group id="natalieWalking">
+        <!-- xflow -->
+        <data id="natalieWalkingXflow" compute="normal = xflow.skinDirection(normal, boneIdx, boneWeight, boneXform)">
+            <data compute="position = xflow.skinPosition(position, boneIdx, boneWeight, boneXform)">
+                <data compute="boneXform = xflow.mul(inverseBindPose, pose)">
+                    <data compute="pose = xflow.forwardKinematics(boneParent, pose)">
+                        <data src="xml3d/natalie/natalie.xml#base"/>
+
+                        <data compute="pose = xflow.createTransform({translation: trans, rotation: rot})">
+                            <data compute="trans = xflow.lerpSeq(translation, key)">
+                                <data compute="rot = xflow.slerpSeq(rotation, key)">
+                                    <data src="xml3d/natalie/natalie.xml#animWalk2"/>
+                                    <float id="natalie_walking_animation" name="key">0.2</float>
+                                </data>
+                            </data>
+                        </data>
+                    </data>
+                </data>
+            </data>
+        </data>
+        <!-- meshes -->
+        <group shader="xml3d/natalie/natalie.xml#shaderBody">
+            <mesh type="triangles">
+                <data src="xml3d/natalie/natalie.xml#indexBody"/>
+                <data src="#natalieWalkingXflow"/>
+            </mesh>
+        </group>
+        <group shader="xml3d/natalie/natalie.xml#shaderSkin">
+            <mesh type="triangles">
+                <data src="xml3d/natalie/natalie.xml#indexSkin"/>
+                <data src="#natalieWalkingXflow"/>
+            </mesh>
+        </group>
+        <group shader="xml3d/natalie/natalie.xml#shaderHair">
+            <mesh type="triangles">
+                <data src="xml3d/natalie/natalie.xml#indexHair"/>
+                <data src="#natalieWalkingXflow"/>
+            </mesh>
+        </group>
+    </group>
+
+
+    <!-- Deer -->
+    <group id="2739286456" transform="#transform7" visible="true">
+        <group transform="#transform6">
+            <group xmlns="http://www.xml3d.org/2009/xml3d">
+                <group shader="xml3d/deer/deer.xml#Deer_body.001" transform="xml3d/deer/deer.xml#t_Deer_body">
+                    <mesh src="xml3d/deer/deer.xml#Deer_body_data" type="triangles"/>
+                </group>
+                <group shader="xml3d/deer/deer.xml#Deer_horns.001" transform="xml3d/deer/deer.xml#t_Deer_horns">
+                    <mesh src="xml3d/deer/deer.xml#Deer_horns_data" type="triangles"/>
+                </group>
+            </group>
+        </group>
+    </group>
+    <group id="2739286487" transform="#transform9" visible="true">
+        <group transform="#transform8">
+            <group avatarID="testUser"/>
+        </group>
+    </group>
+</xml3d>
+</body>
+
+</html>
