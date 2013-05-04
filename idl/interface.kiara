@@ -1,5 +1,5 @@
 namespace * omp;
 
 service interface {
-   bool implements(string interfaceURI);
+   bool[] implements(string[] interfaceURI);
 }

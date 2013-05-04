@@ -3,17 +3,54 @@
 <head>
     <title>OMP Client</title>
     <script data-main="scripts/chat.js" type="text/javascript" src="scripts/require.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/chat.css">
 </head>
-<body>
-    <div id="loginForm">
-        <label for="firstname">First name:</label><input id="firstname" value="Test"/> <br/>
-        <label for="lastname">Last name:</label><input id="lastname" value="User"/> <br/>
-        <label for="pass">Password:</label><input type="password" id="pass" value="123"/> <br/>
-        <button id="loginBtn" disabled="disabled">Login</button>
-    </div>
-    <div id="chatInterface" style="display: none">
-        <div id="log" style="height: 500px; background-color: black; color: white; font-family: monospace;"></div>
-        <input id="say" style="width: 100%" />
+<body style="margin: 0px; padding: 0px;">
+    <table id="loginForm">
+        <tr>
+            <td>
+                Type of connection:
+            </td>
+            <td>
+                <select id="connType" name="connType">
+                    <option id="sirikataOption" value="sirikata">Sirikata - localhost:7777</option>
+                    <option id="opensimOption" value="opensim" selected="selected">OpenSim - localhost:9000</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="firstname">First name:</label>
+            </td>
+            <td>
+                <input id="firstname" value="Test"/>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="lastname">Last name:</label>
+            </td>
+            <td>
+                <input id="lastname" value="User"/>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label for="pass">Password:</label>
+            </td>
+            <td>
+                <input type="password" id="pass" value="123"/>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <button id="loginBtn" disabled="disabled">Login</button>
+            </td>
+        </tr>
+    </table>
+    <div id="chatInterface">
+        <div id="log"></div>
+        <input id="say" />
     </div>
 </body>
 </html>

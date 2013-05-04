@@ -68,7 +68,7 @@ function(OMP, $, XML3DGraphics) {
     }
 
     $("#loginBtn").click(function() {
-        var client = new OMP.ViewerClient(handleCreateObject, handleDeleteObject, handleLocationUpdate);
+        var client = new OMP.OpenSIMViewerClient(handleCreateObject, handleDeleteObject, handleLocationUpdate);
         client.login($("#firstname").val(), $("#lastname").val(), $("#pass").val(), function() {
             client.connect(function() {
                 $("#loginForm").hide();

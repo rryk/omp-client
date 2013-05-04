@@ -1,0 +1,26 @@
+#loginForm {
+    padding: 5px;
+    margin: 0px;
+    height: 100px;
+    background-color: lightgray;
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    border: none;
+}
+
+#chatInterface {
+    display: none;
+}
+
+#log {
+    height: 500px; background-color: black; color: white; font-family: monospace;
+}
+
+#say {
+    width: 100%;
+}
+
+#loginBtn {
+    width: 100%;
+}

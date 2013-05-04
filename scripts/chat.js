@@ -65,35 +65,39 @@ function(OMP, $, base64) {
             renderLog();
         }
 
-        var client = new OMP.ChatClient(handleChat, handleTypingStatus);
+        var client = new OMP.OpenSIMChatClient(handleChat, handleTypingStatus);
         client.login($("#firstname").val(), $("#lastname").val(), $("#pass").val(), function() {
-            client.connect(function() {
-                $("#loginForm").hide();
-                $("#chatInterface").show();
-                $("#say").keypress(function(e) {
-                    if (e.keyCode == 13) {
-                        client.sendMessage($("#say").val());
-                        client.setTypingStatus(false);
-                        if (self.typingStatusTimeout) {
-                            delete self.typingStatusTimeout;
-                            clearTimeout(self.typingStatusTimeout);
-                        }
-                        $("#say").val("");
-                    } else {
-                        if (self.typingStatusTimeout)
-                            clearTimeout(self.typingStatusTimeout);
-                        else
-                            client.setTypingStatus(true);
+            var connType = $("#connType").val();
+            if (connType == "sirikata") {
 
-                        self.typingStatusTimeout = setTimeout(function() {
+            } else  if (connType == "opensim") {
+                client.connect(function() {
+                    $("#chatInterface").show();
+                    $("#say").keypress(function(e) {
+                        if (e.keyCode == 13) {
+                            client.sendMessage($("#say").val());
                             client.setTypingStatus(false);
-                            if (self.typingStatusTimeout)
+                            if (self.typingStatusTimeout) {
                                 delete self.typingStatusTimeout;
-                        }, 3000);
-                    }
+                                clearTimeout(self.typingStatusTimeout);
+                            }
+                            $("#say").val("");
+                        } else {
+                            if (self.typingStatusTimeout)
+                                clearTimeout(self.typingStatusTimeout);
+                            else
+                                client.setTypingStatus(true);
+
+                            self.typingStatusTimeout = setTimeout(function() {
+                                client.setTypingStatus(false);
+                                if (self.typingStatusTimeout)
+                                    delete self.typingStatusTimeout;
+                            }, 3000);
+                        }
+                    });
+                    $("#say").focus();
                 });
-                $("#say").focus();
-            });
+            }
         });
     });
     $("#loginBtn").removeAttr("disabled");

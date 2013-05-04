@@ -15,6 +15,8 @@
     }
 } (this, function (logger, KIARA, md5, base64) {
 
+    // Notation. Methods with "_" prefix are protected, methods with "__" prefix are private, other methods are public.
+
     var REMOTE_IDL_URL_PREFIX = "http://yellow.cg.uni-saarland.de/home/kiara/idl/";
     //var REMOTE_IDL_URL_PREFIX = "http://localhost:8080/idl/";
 
@@ -27,9 +29,9 @@
 
     if (isNode) {
         var util = require('util');
+        OMP.inherits = util.inherits;
     } else {
-        var util = {};
-        util.inherits = function(ctor, superCtor) {
+        OMP.inherits = function(ctor, superCtor) {
             ctor.super_ = superCtor;
             ctor.prototype = Object.create(superCtor.prototype);
             ctor.prototype.constructor = ctor;
@@ -39,17 +41,32 @@
 
     //  =============================== Client ===============================
 
-    OMP.Client = function () {
+    OMP.Client = function() {
         var self = this;
 
         self._registerProtocols();
     }
 
-    OMP.Client.prototype.login = function (first, last, password, callback) {
+    // Abstract. Registers protocols necessary for a given server.
+    OMP.Client.prototype._registerProtocols = function() {}
+
+    // Abstract. Call a function |functionName| with |arguments|.
+    OMP.Client.prototype._call = function(functionName /* ... arguments ... */) {}
+
+    //  =============================== OpenSIMClient ===============================
+
+    OMP.OpenSIMClient = function () {
         var self = this;
 
-        var context = self.context = KIARA.createContext();
-        self.loginConnection = context.openConnection(REMOTE_IDL_URL_PREFIX + "login.kiara",
+        OMP.Client.call(self);
+    }
+    OMP.inherits(OMP.OpenSIMClient, OMP.Client);
+
+    OMP.OpenSIMClient.prototype.login = function (first, last, password, callback) {
+        var self = this;
+
+        var context = self.__context = KIARA.createContext();
+        self.__loginConnection = context.openConnection(REMOTE_IDL_URL_PREFIX + "login.kiara",
             function (err, conn) {
                 if (err) {
                     logger.error(err);
@@ -66,7 +83,7 @@
                     },
                     pwdHash: "$1$" + md5.hex_md5(password),
                     start: "last",
-                    channel: "OpenSIM OMP JS Client",
+                    channel: "OpenSIM OMP JS OpenSIMClient",
                     version: "0.1",
                     platform: "Lin",
                     mac: "00:00:00:00:00:00",  // FIXME(rryk): We can't get MAC address from the JavaScript.
@@ -82,9 +99,9 @@
                     if (exception) {
                         logger.error("Got exception for login request: " + exception);
                     } else {
-                        self.circuitCode = result["circuit_code"];
-                        self.sessionID = result["session_id"];
-                        self.agentID = result["agent_id"];
+                        self._circuitCode = result["circuit_code"];
+                        self._sessionID = result["session_id"];
+                        self._agentID = result["agent_id"];
                         callback();
                     }
                 });
@@ -95,54 +112,77 @@
         );
     }
 
-    OMP.Client.prototype.connect = function(callback) {
+    OMP.OpenSIMClient.prototype.connect = function(callback) {
         var self = this;
-        if (!self.sessionID || !self.agentID || !self.circuitCode)
+        if (!self._sessionID || !self._agentID || !self._circuitCode)
             throw new KIARA.Error(KIARA.API_ERROR, "Login response missing to connect. Please login first.");
 
-        var connection = self.regionConnection = self.context.openConnection(
+        var connection = self.__regionConnection = self.__context.openConnection(
             REMOTE_IDL_URL_PREFIX + "interface.kiara",
             function(err, conn) {
                 if (err)
                   callback(false, err);
 
-                self.server = {};
-                self.supportedInterfaces = [REMOTE_IDL_URL_PREFIX + "interface.kiara"];
-                self.regionConnection.loadIDL(REMOTE_IDL_URL_PREFIX + "interface.kiara");
-                self.server["omp.interface.implements"] =
-                    self.regionConnection.generateFuncWrapper("omp.interface.implements", "...");
+                self.__server = {};
+                self.__supportedInterfaces = [REMOTE_IDL_URL_PREFIX + "interface.kiara"];
+                self.__regionConnection.loadIDL(REMOTE_IDL_URL_PREFIX + "interface.kiara");
+                self.__server["omp.interface.implements"] =
+                    self.__regionConnection.generateFuncWrapper("omp.interface.implements", "...");
 
-                self._configureConnectInterfaces(function() {
+                self.__configureConnectInterfaces(function() {
                     self._configureAppInterfaces(function() {
-                        self.server["omp.connectInit.useCircuitCode"](
-                            self.circuitCode,
-                            self.agentID,
-                            self.sessionID
+                        self._call(
+                            "omp.connectInit.useCircuitCode",
+                            self._circuitCode,
+                            self._agentID,
+                            self._sessionID
                         );
-                        self.clientCallback = callback;
+                        self.__clientCallback = callback;
                     });
                 });
             }
         );
     }
 
-    OMP.Client.prototype._registerProtocols = function () {
+    OMP.OpenSIMClient.prototype._call = function(functionName /* ... arguments ... */) {
+        var self = this;
+        if (!self.__server) {
+            throw new KIARA.Error(KIARA.API_ERROR,
+                "Can't call function: " + functionName + ". Server API was not initialized yet.");
+        }
+
+        if (!self.__server[functionName] || typeof(self.__server[functionName]) != "function") {
+            throw new KIARA.Error(KIARA.API_ERROR,
+                "Can't call function: " + functionName + ". It is not defined or not a function.");
+        }
+
+        // Remove function name from the arguments.
+        var args = Array.prototype.slice.call(arguments);
+        args.splice(0, 1);
+
+        // Call the function.
+        return self.__server[functionName].apply(null, args);
+    }
+
+    OMP.OpenSIMClient.prototype._registerProtocols = function () {
         // JSON WebSocket protocol (uses JSON-serialized calls)
 
         function JSONWebSocket(url) {
-            KIARA.Protocol.call(this, 'websocket-json');
-            this._url = url;
+            var self = this;
 
-            this.MAX_RECONNECT_ATTEMPTS = 5;
+            KIARA.Protocol.call(self, 'websocket-json');
+            self.__url = url;
 
-            this._funcs = {};
-            this._oneway = {};
-            this._activeCalls = {};
-            this._cachedCalls = [];
-            this._nextCallID = 0;
-            this._reconnectAttempts = 0;
+            self.__maxReconnectAttempts = 5;
 
-            this.connect();
+            self.__funcs = {};
+            self.__oneway = {};
+            self.__activeCalls = {};
+            self.__cachedCalls = [];
+            self.__nextCallID = 0;
+            self.__reconnectAttempts = 0;
+
+            self.connect();
         }
 
         KIARA.inherits(JSONWebSocket, KIARA.Protocol);
@@ -152,41 +192,49 @@
         //   [ 'call-reply', callID, success, retValOrException ]
 
         JSONWebSocket.prototype.connect = function () {
-            this._wb = new WebSocket(this._url);
-            this._wb.onopen = this._handleConnect.bind(this);
-            this._wb.onerror = this._wb.onclose = this._handleDisconnect.bind(this);
-            this._wb.onmessage = this._handleMessage.bind(this);
+            var self = this;
+
+            self.__wb = new WebSocket(self.__url);
+            self.__wb.onopen = self.__handleConnect.bind(self);
+            self.__wb.onerror = self.__wb.onclose = self.__handleDisconnect.bind(self);
+            self.__wb.onmessage = self.__handleMessage.bind(self);
         }
 
         JSONWebSocket.prototype.callMethod = function (callResponse, args) {
-            if (this._wb.readyState == WebSocket.OPEN) {
-                var callID = this._nextCallID++;
+            var self = this;
+
+            if (self.__wb.readyState == WebSocket.OPEN) {
+                var callID = self.__nextCallID++;
                 var argsArray = Array.prototype.slice.call(args);
                 var request = [ "call", callID, callResponse.getMethodName() ].concat(argsArray);
-                this._wb.send(JSON.stringify(request));
+                self.__wb.send(JSON.stringify(request));
                 if (!callResponse.isOneWay())
-                    this._activeCalls[callID] = callResponse;
+                    self.__activeCalls[callID] = callResponse;
             } else {
-                this._cachedCalls.push([callResponse, args]);
+                self.__cachedCalls.push([callResponse, args]);
             }
         }
 
         JSONWebSocket.prototype.registerFunc = function (methodDescriptor, nativeMethod) {
-            this._funcs[methodDescriptor.methodName] = nativeMethod;
-            this._oneway[methodDescriptor.methodName] = methodDescriptor.isOneWay;
+            var self = this;
+
+            self.__funcs[methodDescriptor.methodName] = nativeMethod;
+            self.__oneway[methodDescriptor.methodName] = methodDescriptor.isOneWay;
         }
 
-        JSONWebSocket.prototype._handleMessage = function (message) {
+        JSONWebSocket.prototype.__handleMessage = function (message) {
+            var self = this;
+
             var data = JSON.parse(message.data);
             var msgType = data[0];
             if (msgType == 'call-reply') {
                 var callID = data[1];
-                if (callID in this._activeCalls) {
-                    var callResponse = this._activeCalls[callID];
+                if (callID in self.__activeCalls) {
+                    var callResponse = self.__activeCalls[callID];
                     var success = data[2];
                     var retValOrException = data[3];
                     callResponse.setResult(retValOrException, success ? 'result' : 'exception');
-                    delete this._activeCalls[callID];
+                    delete self.__activeCalls[callID];
                 } else {
                     throw new KIARA.Error(KIARA.CONNECTION_ERROR,
                         "Received a response for an unrecognized call id: " + callID);
@@ -194,19 +242,19 @@
             } else if (msgType == 'call') {
                 var callID = data[1];
                 var methodName = data[2];
-                if (methodName in this._funcs) {
+                if (methodName in self.__funcs) {
                     var args = data.slice(3);
                     var response = [ 'call-reply', callID ];
                     try {
-                        retVal = this._funcs[methodName].apply(null, args);
+                        retVal = self.__funcs[methodName].apply(null, args);
                         response.push(true);
                         response.push(retVal);
                     } catch (exception) {
                         response.push(false);
                         response.push(exception);
                     }
-                    if (!this._oneway[methodName])
-                        this._wb.send(JSON.stringify(response));
+                    if (!self.__oneway[methodName])
+                        self.__wb.send(JSON.stringify(response));
                 } else {
                     throw new KIARA.Error(KIARA.CONNECTION_ERROR,
                         "Received a call for an unregistered method: " + methodName);
@@ -216,119 +264,123 @@
             }
         }
 
-        JSONWebSocket.prototype._handleConnect = function () {
-            for (var callIndex in this._cachedCalls) {
-                var call = this._cachedCalls[callIndex];
-                this.callMethod(call[0], call[1])
+        JSONWebSocket.prototype.__handleConnect = function () {
+            var self = this;
+
+            for (var callIndex in self.__cachedCalls) {
+                var call = self.__cachedCalls[callIndex];
+                self.callMethod(call[0], call[1])
             }
-            this._cachedCalls = [];
+            self.__cachedCalls = [];
         }
 
-        JSONWebSocket.prototype._handleDisconnect = function (event) {
-            this._reconnectAttempts++;
-            if (this._reconnectAttempts <= this.MAX_RECONNECT_ATTEMPTS) {
-                this.connect();
+        JSONWebSocket.prototype.__handleDisconnect = function (event) {
+            var self = this;
+
+            self.__reconnectAttempts++;
+            if (self.__reconnectAttempts <= self.__maxReconnectAttempts) {
+                self.connect();
             } else {
-                for (var callID in this._activeCalls) {
-                    var callResponse = this._activeCalls[callID];
+                for (var callID in self.__activeCalls) {
+                    var callResponse = self.__activeCalls[callID];
                     callResponse.setResult(event, 'error');
                 }
-                this._activeCalls = {};
+                self.__activeCalls = {};
 
-                for (var callIndex in this._cachedCalls) {
-                    var cachedCall = this._cachedCalls[callIndex];
+                for (var callIndex in self.__cachedCalls) {
+                    var cachedCall = self.__cachedCalls[callIndex];
                     cachedCall[0].setResult(event, 'error');
                 }
-                this._cachedCalls = [];
+                self.__cachedCalls = [];
             }
         }
 
         KIARA.registerProtocol('websocket-json', JSONWebSocket);
     }
 
-    // Client functions
-    OMP.Client.prototype._interfaceImplements = function(interfaceURI) {
+    // OpenSIMClient functions
+    OMP.OpenSIMClient.prototype.__interfaceImplements = function(interfaceURIs) {
         var self = this;
-        return self.supportedInterfaces.indexOf(interfaceURI) != -1;
+
+        var result = [];
+        for (var i = 0; i < interfaceURIs.length; i++)
+            result.push(self.__supportedInterfaces.indexOf(interfaceURIs[i]) != -1);
+        return result;
     };
 
-    OMP.Client.prototype._connectRegionHandshake = function(handshakeRequest) {
+    OMP.OpenSIMClient.prototype.__connectRegionHandshake = function(handshakeRequest) {
         var self = this;
-        self.server["omp.connectServer.handshakeReply"]({
-            AgentData: {AgentID: self.agentID, SessionID: self.sessionID},
+        self._call("omp.connectServer.handshakeReply", {
+            AgentData: {AgentID: self._agentID, SessionID: self._sessionID},
             RegionInfo: {Flags: 0}
         });
 
-        self.clientCallback();
-        delete self.clientCallback;
+        self.__clientCallback();
+        delete self.__clientCallback;
     }
 
-    OMP.Client.prototype._configureInterfaces = function(localInterfaces, localFunctions, remoteInterfaces,
-                                                         remoteFunctions, callback) {
+    OMP.OpenSIMClient.prototype.__configureInterfaces = function(localInterfaces, localFunctions, remoteInterfaces,
+                                                                 remoteFunctions, callback) {
         var self = this;
 
         // Configure local interfaces
         for (var index = 0; index < localInterfaces.length; index++) {
-            if (!self._interfaceImplements(localInterfaces[index])) {
-                self.regionConnection.loadIDL(localInterfaces[index]);
-                self.supportedInterfaces.push(localInterfaces[index]);
+            if (self.__supportedInterfaces.indexOf(localInterfaces[index]) == -1) {
+                self.__regionConnection.loadIDL(localInterfaces[index]);
+                self.__supportedInterfaces.push(localInterfaces[index]);
             }
         }
 
         // Configure local functions
         for (var localFunctionName in localFunctions) {
             var localFunction = localFunctions[localFunctionName].bind(self);
-            self.regionConnection.registerFuncImplementation(
+            self.__regionConnection.registerFuncImplementation(
                 localFunctionName, "...", localFunction);
         }
 
         // Check remote interfaces
         var numInterfaces = remoteInterfaces.length;
-        var loadedInterfaces = 0;
-        var failedToLoad = false;
-
         if (numInterfaces == 0) {
             callback();
             return;
         }
 
         function errorCallback(reason) {
-            failedToLoad = true;
             logger.error("Failed to acquire required server interfaces - " + reason);
         }
 
         function resultCallback(exception, result) {
-            if (failedToLoad)
-                return;
-
             if (exception) {
                 errorCallback("exception returned by the client");
-            } else if (!result) {
-                errorCallback("not supported by the client");
             } else {
-                loadedInterfaces += 1;
-                if (loadedInterfaces == numInterfaces) {
-                    // Configure remote functions.
-                    for (var index = 0; index < remoteInterfaces.length; index++) {
-                        var remoteFunction = remoteFunctions[index];
-                        self.server[remoteFunction] = self.regionConnection.generateFuncWrapper(remoteFunction, "...");
+                for (var i = 0; i < numInterfaces; i++) {
+                    if (!result[i]) {
+                        errorCallback("interface " + remoteInterfaces[i] + " is not supported by the client");
+                        return;
                     }
-                    // Execute... ehm, well... the callback. Is this comment even useful?
-                    callback();
                 }
+
+                // Generate remote function wrappers.
+                for (var index = 0; index < remoteFunctions.length; index++) {
+                    var remoteFunction = remoteFunctions[index];
+                    self.__server[remoteFunction] = self.__regionConnection.generateFuncWrapper(remoteFunction, "...");
+                }
+
+                // Execute... ehm, well... the callback. Is this comment even useful?
+                callback();
             }
         }
 
-        for (var index = 0; index < numInterfaces; index++) {
-            self.server["omp.interface.implements"](remoteInterfaces[index])
-                .on('result', resultCallback)
-                .on('error', errorCallback)
-            self.regionConnection.loadIDL(remoteInterfaces[index]);
-        }
+        for (var index = 0; index < numInterfaces; index++)
+            self.__regionConnection.loadIDL(remoteInterfaces[index]);
+
+        self._call("omp.interface.implements", remoteInterfaces)
+            .on('result', resultCallback)
+            .on('error', errorCallback)
     }
 
     // Configures local and remote interfaces. On success |callback| is called.
-    OMP.Client.prototype._configureConnectInterfaces = function(callback) {
+    OMP.OpenSIMClient.prototype.__configureConnectInterfaces = function(callback) {
         var self = this;
 
         var localInterfaces = [
@@ -337,8 +389,8 @@
         ];
 
         var localFunctions = {
-            "omp.interface.implements": self._interfaceImplements,
-            "omp.connectClient.handshake": self._connectRegionHandshake
+            "omp.interface.implements": self.__interfaceImplements,
+            "omp.connectClient.handshake": self.__connectRegionHandshake
         };
 
         var remoteInterfaces = [
@@ -351,42 +403,43 @@
             "omp.connectInit.useCircuitCode"
         ];
 
-        self._configureInterfaces(localInterfaces, localFunctions, remoteInterfaces, remoteFunctions, callback);
+        self.__configureInterfaces(localInterfaces, localFunctions, remoteInterfaces, remoteFunctions, callback);
     }
 
-    // Configure interfaces after handshake is received
-    OMP.Client.prototype._configureAppInterfaces = function(callback) {}
+    // Abstract. Configure interfaces after handshake is received.
+    OMP.OpenSIMClient.prototype._configureAppInterfaces = function(callback) {}
 
-    //  =============================== ChatClient ===============================
+    //  =============================== OpenSIMChatClient ===============================
 
-    OMP.ChatClient = function(onMessage, onTypingStatus) {
+    OMP.OpenSIMChatClient = function(onMessage, onTypingStatus) {
         var self = this;
 
-        OMP.Client.call(self);
-        self.onMessage = onMessage;
-        self.onTypingStatus = onTypingStatus;
-    }
-    util.inherits(OMP.ChatClient, OMP.Client);
+        OMP.OpenSIMClient.call(self);
 
-    OMP.ChatClient.prototype._handleMessageFromServer = function(packet) {
+        self._onMessage = onMessage;
+        self._onTypingStatus = onTypingStatus;
+    }
+    OMP.inherits(OMP.OpenSIMChatClient, OMP.OpenSIMClient);
+
+    OMP.OpenSIMChatClient.prototype.__handleMessageFromServer = function(packet) {
         var self = this;
 
         var from = base64.decode(packet.ChatData.FromName);
         if (packet.ChatData.ChatType >= 0 && packet.ChatData.ChatType <= 3) {
             var msg = base64.decode(packet.ChatData.Message);
-            self.onMessage(from, msg);
+            self._onMessage(from, msg);
         } else if (packet.ChatData.ChatType == 4) {
-            if (packet.ChatData.SourceID.Guid != self.agentID)
-                self.onTypingStatus(from, true);
+            if (packet.ChatData.SourceID.Guid != self._agentID)
+                self._onTypingStatus(from, true);
         } else if (packet.ChatData.ChatType == 5) {
-            if (packet.ChatData.SourceID.Guid != self.agentID)
-                self.onTypingStatus(from, false);
+            if (packet.ChatData.SourceID.Guid != self._agentID)
+                self._onTypingStatus(from, false);
         } else {
-            self.onMessage("Debug", JSON.stringify(packet))
+            self._onMessage("Debug", JSON.stringify(packet))
         }
     }
 
-    OMP.ChatClient.prototype._configureAppInterfaces = function(callback) {
+    OMP.OpenSIMChatClient.prototype._configureAppInterfaces = function(callback) {
         var self = this;
 
         var localInterfaces = [
@@ -394,7 +447,7 @@
         ];
 
         var localFunctions = {
-            "omp.chatClient.messageFromServer": self._handleMessageFromServer
+            "omp.chatClient.messageFromServer": self.__handleMessageFromServer
         }
 
         var remoteInterfaces = [
@@ -405,26 +458,43 @@
             "omp.chatServer.messageFromClient"
         ];
 
-        self._configureInterfaces(localInterfaces, localFunctions, remoteInterfaces, remoteFunctions, callback);
+        self.__configureInterfaces(localInterfaces, localFunctions, remoteInterfaces, remoteFunctions, callback);
     }
 
-    OMP.ChatClient.prototype.sendMessage = function(message) {
+    OMP.OpenSIMChatClient.prototype.sendMessage = function(message) {
         var self = this;
-        self.server["omp.chatServer.messageFromClient"]({
-            AgentData: {AgentID: self.agentID, SessionID: self.sessionID},
+        self._call("omp.chatServer.messageFromClient", {
+            AgentData: {AgentID: self._agentID, SessionID: self._sessionID},
             ChatData: {Channel: 0, Message: base64.encode(message), Type: 2}
         });
     }
 
-    OMP.ChatClient.prototype.setTypingStatus = function(isTyping) {
+    OMP.OpenSIMChatClient.prototype.setTypingStatus = function(isTyping) {
         var self = this;
-        self.server["omp.chatServer.messageFromClient"]({
-            AgentData: {AgentID: self.agentID, SessionID: self.sessionID},
+        self._call("omp.chatServer.messageFromClient", {
+            AgentData: {AgentID: self._agentID, SessionID: self._sessionID},
             ChatData: {Channel: 0, Message: "", Type: (isTyping ? 4 : 5)}
         });
     }
 
-    //  =============================== ViewerClient ===============================
+    //  =============================== SirikataChatClient ===============================
+
+    OMP.SirikataChatClient = function(onMessage, onTypingStatus) {
+        var self = this;
+    }
+    OMP.inherits(OMP.SirikataChatClient, OMP.Client);
+
+    OMP.SirikataChatClient.prototype.sendMessage = function(message) {
+        var self = this;
+
+    }
+
+    OMP.SirikataChatClient.prototype.setTypingStatus = function(isTyping) {
+        var self = this;
+
+    }
+
+    //  =============================== OpenSIMViewerClient ===============================
 
     // User handlers may be passed to the constructor. The signatures for them are:
     //   onCreateObject(id, xml3dRepresentation, isAgentAvatar)
@@ -438,35 +508,35 @@
     //     pos - an object with x, y and z properties (vector)
     //     rot - an object with w, x, y and z properties (quaternion)
     //     scale - an object with x, y and z properties (vector)
-    OMP.ViewerClient = function(onCreateObject, onDeleteObject, onLocationUpdate) {
+    OMP.OpenSIMViewerClient = function(onCreateObject, onDeleteObject, onLocationUpdate) {
         var self = this;
 
-        OMP.Client.call(self);
-        self.onCreateObject = onCreateObject;
-        self.onDeleteObject = onDeleteObject;
-        self.onLocationUpdate = onLocationUpdate;
+        OMP.OpenSIMClient.call(self);
+        self.__onCreateObject = onCreateObject;
+        self.__onDeleteObject = onDeleteObject;
+        self.__onLocationUpdate = onLocationUpdate;
     }
-    util.inherits(OMP.ViewerClient, OMP.Client);
+    OMP.inherits(OMP.OpenSIMViewerClient, OMP.OpenSIMClient);
 
-    OMP.ViewerClient.prototype._handleCreateObject = function(uuid, localID, xml3dRepresentation) {
+    OMP.OpenSIMViewerClient.prototype.__handleCreateObject = function(uuid, localID, xml3dRepresentation) {
         var self = this;
 
-        logger.info("create object " + localID + (uuid == self.agentID ? " (avatar)" : "") + " uuid="+uuid.Guid);
+        logger.info("create object " + localID + (uuid == self._agentID ? " (avatar)" : "") + " uuid="+uuid.Guid);
 
-        if (self.onCreateObject)
-            self.onCreateObject(localID, xml3dRepresentation, uuid == self.agentID);
+        if (self.__onCreateObject)
+            self.__onCreateObject(localID, xml3dRepresentation, uuid == self._agentID);
     }
 
-    OMP.ViewerClient.prototype._handleDeleteObject = function(localIDs) {
+    OMP.OpenSIMViewerClient.prototype.__handleDeleteObject = function(localIDs) {
         var self = this;
 
-        if (self.onDeleteObject) {
+        if (self.__onDeleteObject) {
             for (var index = 0; index < localIDs.length; index++)
-                self.onDeleteObject(localIDs[index]);
+                self.__onDeleteObject(localIDs[index]);
         }
     }
 
-    OMP.ViewerClient.prototype._handleLocationUpdate = function(localID, position, rotation, scale) {
+    OMP.OpenSIMViewerClient.prototype.__handleLocationUpdate = function(localID, position, rotation, scale) {
         var self = this;
 
         logger.info("location update for " + localID +
@@ -474,8 +544,8 @@
             "\n(rotation XYZW "+rotation.X+" "+rotation.Y+" "+rotation.Z+" "+rotation.W+") "+
             "\n(scale XYZ "+scale.X+" "+scale.Y+" "+scale.Z+")");
 
-        if (self.onLocationUpdate) {
-            self.onLocationUpdate(
+        if (self.__onLocationUpdate) {
+            self.__onLocationUpdate(
                 localID,
                 {x: position.X, y: position.Y, z: position.Z},
                 {x: rotation.X, y: rotation.Y, z: rotation.Z, w: rotation.W},
@@ -484,7 +554,7 @@
         }
     }
 
-    OMP.ViewerClient.prototype._configureAppInterfaces = function(callback) {
+    OMP.OpenSIMViewerClient.prototype._configureAppInterfaces = function(callback) {
         var self = this;
 
         var localInterfaces = [
@@ -492,9 +562,9 @@
         ];
 
         var localFunctions = {
-            "omp.objectSync.createObject": self._handleCreateObject,
-            "omp.objectSync.deleteObject": self._handleDeleteObject,
-            "omp.objectSync.locationUpdate": self._handleLocationUpdate,
+            "omp.objectSync.createObject": self.__handleCreateObject,
+            "omp.objectSync.deleteObject": self.__handleDeleteObject,
+            "omp.objectSync.locationUpdate": self.__handleLocationUpdate,
         }
 
         var remoteInterfaces = [
@@ -505,7 +575,7 @@
             "omp.movement.agentUpdate"
         ];
 
-        self._configureInterfaces(localInterfaces, localFunctions, remoteInterfaces, remoteFunctions, callback);
+        self.__configureInterfaces(localInterfaces, localFunctions, remoteInterfaces, remoteFunctions, callback);
     }
 
     // Notifies the server about the state of the user's viewer. Arguments describe this state:
@@ -515,20 +585,20 @@
     //                                          the user's camera, any object with x, y and z properties
     //   |controls| - a number describing user controls, documentation: http://goo.gl/UplNa,
     //                used in OpenSim to run scripts triggered by user actions, may be omitted
-    OMP.ViewerClient.prototype.setViewerState = /*void*/ function(position, rotation, cameraUp,
+    OMP.OpenSIMViewerClient.prototype.setViewerState = /*void*/ function(position, rotation, cameraUp,
                                                                   cameraLeft, cameraAt, controls) {
         var self = this;
-        if (self.tooFastStateUpdates)
+        if (self.__tooFastStateUpdates)
           return;
 
-        self.tooFastStateUpdates = true;
+        self.__tooFastStateUpdates = true;
 
         if (!controls)
           controls = 0;
 
-        self.server["omp.movement.agentUpdate"]({
+        self._call("omp.movement.agentUpdate", {
             AgentData: {
-                AgentID: self.agentID,
+                AgentID: self._agentID,
                 BodyRotation: {X: rotation.x, Y: rotation.y, Z: rotation.z, W: rotation.w},
                 CameraAtAxis: {X: cameraAt.x, Y: cameraAt.y, Z: cameraAt.z},
                 CameraCenter: {X: position.x, Y: position.y, Z: position.z},
@@ -538,12 +608,12 @@
                 Far: 1e9,
                 Flags: 0,
                 HeadRotation: {X: rotation.x, Y: rotation.y, Z: rotation.z, W: rotation.w},
-                SessionID: self.sessionID,
+                SessionID: self._sessionID,
                 State: 0
             }
         });
 
-        setTimeout(function() { self.tooFastStateUpdates = false }, 100);
+        setTimeout(function() { self.__tooFastStateUpdates = false }, 100);
     }
 
     return OMP;
