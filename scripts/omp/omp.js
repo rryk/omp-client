@@ -17,7 +17,7 @@
 
     // Notation. Methods with "_" prefix are protected, methods with "__" prefix are private, other methods are public.
 
-    var REMOTE_IDL_URL_PREFIX = "http://yellow.cg.uni-saarland.de/home/kiara/idl/";
+    var REMOTE_IDL_URL_PREFIX = "http://yellow.cg.uni-saarland.de/home/omp-client/idl/";
     //var REMOTE_IDL_URL_PREFIX = "http://localhost:8080/idl/";
 
 
@@ -351,11 +351,11 @@
 
         function resultCallback(exception, result) {
             if (exception) {
-                errorCallback("exception returned by the client");
+                errorCallback("exception returned by the server");
             } else {
                 for (var i = 0; i < numInterfaces; i++) {
                     if (!result[i]) {
-                        errorCallback("interface " + remoteInterfaces[i] + " is not supported by the client");
+                        errorCallback("interface " + remoteInterfaces[i] + " is not supported by the server");
                         return;
                     }
                 }
