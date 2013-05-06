@@ -37,40 +37,58 @@ requirejs.config({
 
 requirejs(['omp/omp', 'jquery', 'base64'],
 function(OMP, $, base64) {
+    var numLogins = 0;
+    var typingUsers = [];
+    var log = [];
+
+    function renderLog() {
+        var logHtml = "";
+        for (var index = 0; index < log.length; index++) {
+            if (log[index].tag && numLogins > 1)
+                logHtml += "{" + log[index].tag + "} ";
+            logHtml += "[" + log[index].from + "] " + log[index].msg + "<br/>";
+        }
+        for (var index = 0; index < typingUsers.length; index++)
+            logHtml += typingUsers[index] + " is typing... <br/>";
+        $("#log").html(logHtml);
+    }
+
+    function handleTypingStatus(who, started) {
+        var index = typingUsers.indexOf(who);
+        if (started && index == -1) {
+            typingUsers.push(who);
+        } else if (!started && index != -1) {
+            typingUsers.splice(index, 1);
+        }
+        renderLog();
+    }
+
+    function handleChat(from, msg, tag) {
+        log.push({from: from, msg: msg, tag: tag});
+        renderLog();
+    }
+
+    function updateLoginInterface() {
+        var connType = $("#connType").val();
+        $(".LoginData").hide();
+        $("#loginBtn").removeAttr("disabled");
+        if (connType == "opensim")
+            $(".OpenSIMLoginData").show();
+        else if (connType == "sirikata")
+            $(".SirikataLoginData").show();
+        else
+            $("#loginBtn").attr("disabled", "disabled");
+    }
+
     $("#loginBtn").click(function() {
-        var typingUsers = [];
-        var log = [];
-
-        function renderLog() {
-            var logHtml = "";
-            for (var index = 0; index < log.length; index++)
-                logHtml += "[" + log[index].from + "] " + log[index].msg + "<br/>";
-            for (var index = 0; index < typingUsers.length; index++)
-                logHtml += typingUsers[index] + " is typing... <br/>";
-            $("#log").html(logHtml);
-        }
-
-        function handleTypingStatus(who, started) {
-            var index = typingUsers.indexOf(who);
-            if (started && index == -1) {
-                typingUsers.push(who);
-            } else if (!started && index != -1) {
-                typingUsers.splice(index, 1);
+        var connType = $("#connType").val();
+        if (connType == "opensim") {
+            function handleOpenSimChat(from, msg) {
+                handleChat(from, msg, "OpenSIM");
             }
-            renderLog();
-        }
 
-        function handleChat(from, msg) {
-            log.push({from: from, msg: msg});
-            renderLog();
-        }
-
-        var client = new OMP.OpenSIMChatClient(handleChat, handleTypingStatus);
-        client.login($("#firstname").val(), $("#lastname").val(), $("#pass").val(), function() {
-            var connType = $("#connType").val();
-            if (connType == "sirikata") {
-
-            } else  if (connType == "opensim") {
+            var client = new OMP.OpenSIMChatClient(handleOpenSimChat, handleTypingStatus);
+            client.login($("#firstname").val(), $("#lastname").val(), $("#pass").val(), function() {
                 client.connect(function() {
                     $("#chatInterface").show();
                     $("#say").keypress(function(e) {
@@ -96,9 +114,22 @@ function(OMP, $, base64) {
                         }
                     });
                     $("#say").focus();
+                    numLogins++;
                 });
-            }
-        });
+            });
+
+            $("#opensimOption").attr("disabled", "disabled");
+            $("#opensimOption").removeAttr("selected");
+            updateLoginInterface();
+        } else if (connType == "sirikata") {
+            logger.error("Not implemented");
+            numLogins++;
+            $("#sirikataOption").attr("disabled", "disabled");
+            $("#sirikataOption").removeAttr("selected");
+            updateLoginInterface();
+        }
     });
     $("#loginBtn").removeAttr("disabled");
+
+    $("#connType").change(updateLoginInterface);
 });
