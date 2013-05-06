@@ -1459,6 +1459,10 @@
                 protocolName = 'websocket-json';
                 protocolUrl = 'ws://' + location.hostname + ':9000/region';
                 break;
+            case "sirikata.kiara":
+                protocolName = "sirikata-protobuf";
+                protocolUrl = 'ws://' + location.hostname + ':7777/';
+                break;
             default:
                 handleError(new KIARAError(KIARA.UNSUPPORTED_FEATURE, "IDL " + url + " is not hard-coded."));
                 break;

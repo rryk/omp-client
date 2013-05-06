@@ -5,7 +5,7 @@
     <script data-main="scripts/chat.js" type="text/javascript" src="scripts/require.js"></script>
     <link rel="stylesheet" type="text/css" href="css/chat.css">
 </head>
-<body style="margin: 0px; padding: 0px;">
+<body>
     <table id="loginForm">
         <tr>
             <td>
@@ -13,12 +13,12 @@
             </td>
             <td>
                 <select id="connType" name="connType">
-                    <option id="sirikataOption" value="sirikata">Sirikata - localhost:7777</option>
-                    <option id="opensimOption" value="opensim" selected="selected">OpenSim - localhost:9000</option>
+                    <option id="sirikataOption" value="sirikata" selected="selected">Sirikata - localhost:7777</option>
+                    <option id="opensimOption" value="opensim">OpenSim - localhost:9000</option>
                 </select>
             </td>
         </tr>
-        <tr class="OpenSIMLoginData LoginData">
+        <tr class="LoginData OpenSIMLoginData" style="display: none">
             <td>
                 <label for="firstname">First name:</label>
             </td>
@@ -26,7 +26,7 @@
                 <input id="firstname" value="Test"/>
             </td>
         </tr>
-        <tr class="OpenSIMLoginData LoginData">
+        <tr class="LoginData OpenSIMLoginData" style="display: none">
             <td>
                 <label for="lastname">Last name:</label>
             </td>
@@ -34,15 +34,15 @@
                 <input id="lastname" value="User"/>
             </td>
         </tr>
-        <tr class="SirikataLoginData LoginData" style="display: none">
+        <tr class="LoginData SirikataLoginData" style="display: none">
             <td>
                 <label for="login">Login:</label>
             </td>
             <td>
-                <input id="login" value="User"/>
+                <input id="login" value="BrowserClient"/>
             </td>
         </tr>
-        <tr class="LoginData OpenSIMLoginData SirikataLoginData">
+        <tr class="LoginData OpenSIMLoginData SirikataLoginData" style="display: none">
             <td>
                 <label for="pass">Password:</label>
             </td>

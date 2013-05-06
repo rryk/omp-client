@@ -7,7 +7,8 @@ requirejs.config({
     //never includes a ".js" extension since
     //the paths config could be for a directory.
     paths: {
-        omp: '../omp'
+        omp: '../omp',
+        sirikata: '../sirikata'
     },
     shim: {
         'logger': {
@@ -40,6 +41,7 @@ function(OMP, $, base64) {
     var numLogins = 0;
     var typingUsers = [];
     var log = [];
+    var sayHandlers = {};
 
     function renderLog() {
         var logHtml = "";
@@ -68,6 +70,15 @@ function(OMP, $, base64) {
         renderLog();
     }
 
+    $("#say").keypress(function(event) {
+        var key = event.keyCode;
+        var val = $("#say").val();
+        for (var index in sayHandlers) {
+            var handler = sayHandlers[index];
+            handler(key, val);
+        }
+    });
+
     function updateLoginInterface() {
         var connType = $("#connType").val();
         $(".LoginData").hide();
@@ -78,7 +89,8 @@ function(OMP, $, base64) {
             $(".SirikataLoginData").show();
         else
             $("#loginBtn").attr("disabled", "disabled");
-    }
+    };
+    updateLoginInterface();
 
     $("#loginBtn").click(function() {
         var connType = $("#connType").val();
@@ -91,9 +103,9 @@ function(OMP, $, base64) {
             client.login($("#firstname").val(), $("#lastname").val(), $("#pass").val(), function() {
                 client.connect(function() {
                     $("#chatInterface").show();
-                    $("#say").keypress(function(e) {
-                        if (e.keyCode == 13) {
-                            client.sendMessage($("#say").val());
+                    sayHandlers["opensim"] = function(key, val) {
+                        if (key == 13) {
+                            client.sendMessage(val);
                             client.setTypingStatus(false);
                             if (self.typingStatusTimeout) {
                                 delete self.typingStatusTimeout;
@@ -112,7 +124,7 @@ function(OMP, $, base64) {
                                     delete self.typingStatusTimeout;
                             }, 3000);
                         }
-                    });
+                    };
                     $("#say").focus();
                     numLogins++;
                 });
@@ -122,8 +134,28 @@ function(OMP, $, base64) {
             $("#opensimOption").removeAttr("selected");
             updateLoginInterface();
         } else if (connType == "sirikata") {
-            logger.error("Not implemented");
-            numLogins++;
+            function handleSirikataChat(from, msg) {
+                handleChat(from, msg, "Sirikata");
+            }
+
+            var client = new OMP.SirikataChatClient(handleSirikataChat);
+            client.connect($("#login").val(), $("#pass").val(), function(connected) {
+                if (!connected)
+                    log.error("Failed to connect to the Sirikata server.");
+                else {
+                    $("#chatInterface").show();
+                    sayHandlers["sirikata"] = function(key, val) {
+                        if (key == 13) {
+                            client.sendMessage(val);
+                            $("#say").val("");
+                        }
+                    };
+                    $("#say").focus();
+                    numLogins++;
+                }
+            });
+
+
             $("#sirikataOption").attr("disabled", "disabled");
             $("#sirikataOption").removeAttr("selected");
             updateLoginInterface();

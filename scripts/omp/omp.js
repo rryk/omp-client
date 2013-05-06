@@ -3,17 +3,20 @@
         // Node. Does not work with strict CommonJS, but
         // only CommonJS-like enviroments that support module.exports,
         // like Node.
-        module.exports = factory(require('logger'), require('kiara'), require('md5'), require('omp'), require('base64'));
+        module.exports = factory(require('logger'), require('kiara'), require('md5'), require('omp'), require('base64'),
+            require('sirikata/sirikata'), require('sirikata/protobuf'), require('sirikata/pbj'));
     } else if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
-        define(['logger', 'kiara', 'md5', 'base64'], function (logger, kiara, md5, base64) {
-            return (root.OMP = factory(logger, kiara, md5, base64));
-        });
+        define(['logger', 'kiara', 'md5', 'base64', 'sirikata/sirikata', 'sirikata/protobuf', 'sirikata/pbj'],
+            function (logger, kiara, md5, base64, Sirikata, PROTO, PBJ) {
+                return (root.OMP = factory(logger, kiara, md5, base64, Sirikata, PROTO, PBJ));
+            }
+        );
     } else {
         // Browser globals
-        root.OMP = factory(root.logger, root.KIARA, root.md5, root.base64);
+        root.OMP = factory(root.logger, root.KIARA, root.md5, root.base64, root.sirikata, root.PROTO, root.PBJ);
     }
-} (this, function (logger, KIARA, md5, base64) {
+} (this, function (logger, KIARA, md5, base64, Sirikata, PROTO, PBJ) {
 
     // Notation. Methods with "_" prefix are protected, methods with "__" prefix are private, other methods are public.
 
@@ -45,13 +48,34 @@
         var self = this;
 
         self._registerProtocols();
+        self._context = KIARA.createContext();
+        self.__server = {};
     }
 
     // Abstract. Registers protocols necessary for a given server.
     OMP.Client.prototype._registerProtocols = function() {}
 
-    // Abstract. Call a function |functionName| with |arguments|.
-    OMP.Client.prototype._call = function(functionName /* ... arguments ... */) {}
+    // Register a wrapper.
+    OMP.Client.prototype._addServerFunc = function(name, conn) {
+        var self = this;
+
+        var wrapper = conn.generateFuncWrapper(name, "...");
+        if (typeof(wrapper) != "function")
+            throw new KIARA.Error(KIARA.API_ERROR, "Passed function wrapper is not a function.");
+        self.__server[name] = wrapper;
+    }
+
+    // Call a function |functionName| with |arguments|.
+    OMP.Client.prototype._call = function(functionName /* ... arguments ... */) {
+        var self = this;
+
+        // Remove function name from the arguments.
+        var args = Array.prototype.slice.call(arguments);
+        args.splice(0, 1);
+
+        // Call the function.
+        return self.__server[functionName].apply(null, args);
+    }
 
     //  =============================== OpenSIMClient ===============================
 
@@ -65,8 +89,7 @@
     OMP.OpenSIMClient.prototype.login = function (first, last, password, callback) {
         var self = this;
 
-        var context = self.__context = KIARA.createContext();
-        self.__loginConnection = context.openConnection(REMOTE_IDL_URL_PREFIX + "login.kiara",
+        self.__loginConnection = self._context.openConnection(REMOTE_IDL_URL_PREFIX + "login.kiara",
             function (err, conn) {
                 if (err) {
                     logger.error(err);
@@ -123,11 +146,9 @@
                 if (err)
                   callback(false, err);
 
-                self.__server = {};
                 self.__supportedInterfaces = [REMOTE_IDL_URL_PREFIX + "interface.kiara"];
                 self.__regionConnection.loadIDL(REMOTE_IDL_URL_PREFIX + "interface.kiara");
-                self.__server["omp.interface.implements"] =
-                    self.__regionConnection.generateFuncWrapper("omp.interface.implements", "...");
+                self._addServerFunc("omp.interface.implements", self.__regionConnection);
 
                 self.__configureConnectInterfaces(function() {
                     self._configureAppInterfaces(function() {
@@ -144,28 +165,12 @@
         );
     }
 
-    OMP.OpenSIMClient.prototype._call = function(functionName /* ... arguments ... */) {
-        var self = this;
-        if (!self.__server) {
-            throw new KIARA.Error(KIARA.API_ERROR,
-                "Can't call function: " + functionName + ". Server API was not initialized yet.");
-        }
-
-        if (!self.__server[functionName] || typeof(self.__server[functionName]) != "function") {
-            throw new KIARA.Error(KIARA.API_ERROR,
-                "Can't call function: " + functionName + ". It is not defined or not a function.");
-        }
-
-        // Remove function name from the arguments.
-        var args = Array.prototype.slice.call(arguments);
-        args.splice(0, 1);
-
-        // Call the function.
-        return self.__server[functionName].apply(null, args);
-    }
-
     OMP.OpenSIMClient.prototype._registerProtocols = function () {
         // JSON WebSocket protocol (uses JSON-serialized calls)
+
+        // Messages:
+        //   [ 'call', callID, methodName, arg1, arg2, ... ]
+        //   [ 'call-reply', callID, success, retValOrException ]
 
         function JSONWebSocket(url) {
             var self = this;
@@ -182,32 +187,19 @@
             self.__nextCallID = 0;
             self.__reconnectAttempts = 0;
 
-            self.connect();
+            self.__connect();
         }
 
         KIARA.inherits(JSONWebSocket, KIARA.Protocol);
 
-        // Messages:
-        //   [ 'call', callID, methodName, arg1, arg2, ... ]
-        //   [ 'call-reply', callID, success, retValOrException ]
-
-        JSONWebSocket.prototype.connect = function () {
-            var self = this;
-
-            self.__wb = new WebSocket(self.__url);
-            self.__wb.onopen = self.__handleConnect.bind(self);
-            self.__wb.onerror = self.__wb.onclose = self.__handleDisconnect.bind(self);
-            self.__wb.onmessage = self.__handleMessage.bind(self);
-        }
-
         JSONWebSocket.prototype.callMethod = function (callResponse, args) {
             var self = this;
 
-            if (self.__wb.readyState == WebSocket.OPEN) {
+            if (self.__ws.readyState == WebSocket.OPEN) {
                 var callID = self.__nextCallID++;
                 var argsArray = Array.prototype.slice.call(args);
                 var request = [ "call", callID, callResponse.getMethodName() ].concat(argsArray);
-                self.__wb.send(JSON.stringify(request));
+                self.__ws.send(JSON.stringify(request));
                 if (!callResponse.isOneWay())
                     self.__activeCalls[callID] = callResponse;
             } else {
@@ -220,6 +212,15 @@
 
             self.__funcs[methodDescriptor.methodName] = nativeMethod;
             self.__oneway[methodDescriptor.methodName] = methodDescriptor.isOneWay;
+        }
+
+        JSONWebSocket.prototype.__connect = function() {
+            var self = this;
+
+            self.__ws = new WebSocket(self.__url);
+            self.__ws.onopen = self.__handleConnect.bind(self);
+            self.__ws.onerror = self.__ws.onclose = self.__handleDisconnect.bind(self);
+            self.__ws.onmessage = self.__handleMessage.bind(self);
         }
 
         JSONWebSocket.prototype.__handleMessage = function (message) {
@@ -254,7 +255,7 @@
                         response.push(exception);
                     }
                     if (!self.__oneway[methodName])
-                        self.__wb.send(JSON.stringify(response));
+                        self.__ws.send(JSON.stringify(response));
                 } else {
                     throw new KIARA.Error(KIARA.CONNECTION_ERROR,
                         "Received a call for an unregistered method: " + methodName);
@@ -279,7 +280,7 @@
 
             self.__reconnectAttempts++;
             if (self.__reconnectAttempts <= self.__maxReconnectAttempts) {
-                self.connect();
+                self.__connect();
             } else {
                 for (var callID in self.__activeCalls) {
                     var callResponse = self.__activeCalls[callID];
@@ -361,10 +362,8 @@
                 }
 
                 // Generate remote function wrappers.
-                for (var index = 0; index < remoteFunctions.length; index++) {
-                    var remoteFunction = remoteFunctions[index];
-                    self.__server[remoteFunction] = self.__regionConnection.generateFuncWrapper(remoteFunction, "...");
-                }
+                for (var index = 0; index < remoteFunctions.length; index++)
+                    self._addServerFunc(remoteFunctions[index], self.__regionConnection);
 
                 // Execute... ehm, well... the callback. Is this comment even useful?
                 callback();
@@ -475,23 +474,6 @@
             AgentData: {AgentID: self._agentID, SessionID: self._sessionID},
             ChatData: {Channel: 0, Message: "", Type: (isTyping ? 4 : 5)}
         });
-    }
-
-    //  =============================== SirikataChatClient ===============================
-
-    OMP.SirikataChatClient = function(onMessage, onTypingStatus) {
-        var self = this;
-    }
-    OMP.inherits(OMP.SirikataChatClient, OMP.Client);
-
-    OMP.SirikataChatClient.prototype.sendMessage = function(message) {
-        var self = this;
-
-    }
-
-    OMP.SirikataChatClient.prototype.setTypingStatus = function(isTyping) {
-        var self = this;
-
     }
 
     //  =============================== OpenSIMViewerClient ===============================
@@ -614,6 +596,205 @@
         });
 
         setTimeout(function() { self.__tooFastStateUpdates = false }, 100);
+    }
+
+    //  =============================== SirikataChatClient ===============================
+
+    // Constructs Sirikata chat client. |onMessage| is invoked whenever a message arrives from another object: two
+    // string arguments will be passed to it - name of the source object and message contents.
+    OMP.SirikataChatClient = function(onMessage) {
+        var self = this;
+
+        OMP.Client.call(self);
+        self.__onMessage = onMessage;
+    }
+    OMP.inherits(OMP.SirikataChatClient, OMP.Client);
+
+    // Authenticate with |login| and |password| and connect to the virtual world. Callback |cb| will be executed with
+    // one argument that will indicate whether connection was successful (true) or not (false).
+    OMP.SirikataChatClient.prototype.connect = function(login, password, callback) {
+        var self = this;
+
+        var connection = self._context.openConnection(REMOTE_IDL_URL_PREFIX + "sirikata.kiara", function(err, conn) {
+            if (err) {
+                logger.error(err);
+                return;
+            }
+
+            self._addServerFunc("omp.sirikata.connect", connection);
+            connection.registerFuncImplementation("omp.sirikata.connectResponse", "...", function(connectionResponse) {
+                self.__connectionResponse = connectionResponse;
+                callback(true);
+                return;
+            });
+
+            var connect = {
+                type: 1,
+                object: OMP.SirikataChatClient.randomUUID(),
+                auth: PROTO.encodeUTF8(password),
+                loc: undefined,
+                orientation: undefined,
+                bounds: [0, 0, 0, 1],
+                query_angle: 1e-26,
+                mesh: "",
+                physics: []
+            };
+            self._call("omp.sirikata.connect", connect);
+        });
+    }
+
+    // Sends a messages to all known avatars.
+    OMP.SirikataChatClient.prototype.sendMessage = function(message) {
+        var self = this;
+
+    }
+
+    OMP.SirikataChatClient.randomUUID = function() {
+        var chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        var uuid = [];
+
+        // rfc4122, version 4 form
+        var r;
+
+        // rfc4122 requires these characters
+        uuid[8] = uuid[13] = uuid[18] = uuid[23] = '-';
+        uuid[14] = '4';
+
+        // Fill in random data.  At i==19 set the high bits of clock sequence as
+        // per rfc4122, sec. 4.1.5
+        for (var i = 0; i < 36; i++) {
+            if (!uuid[i]) {
+                r = 0 | Math.random()*16;
+                uuid[i] = chars[(i == 19) ? (r & 0x3) | 0x8 : r];
+            }
+        }
+
+        return uuid.join('');
+    }
+
+    // Registers Sirikata Protocol Buffers protocol
+    OMP.SirikataChatClient.prototype._registerProtocols = function() {
+        function PBCallDescriptor(methodName, args) {
+            var self = this;
+
+            // FIXME: eventually we should be able to parse this info from the .kiara file, but now we just hardcode it.
+            // FIXME: eventually we should be able to parse type mapping string, but for now we use a hack ("_" fields).
+            self.method = methodName;
+            switch (methodName) {
+                case "omp.sirikata.connect":
+                    self.request = "Sirikata.Protocol.Session.Container";
+                    self.mapping = "Request.connect : Args[0]";
+                    self.oneway = true;
+                    self.target = 'server';
+                    self._requestContainer = "Sirikata.Protocol.Session.Container";
+                    self._requestField = "connect";
+                    break;
+                case "omp.sirikata.connectResponse":
+                    self.request = "Sirikata.Protocol.Session.Container";
+                    self.response = "Sirikata.Protocol.Session.Container";
+                    self.mapping = "Request.connect_response : Args[0]; Response.conneck_ack : Result";
+                    self.target = 'client';
+                    self._requestContainer = self._responseContainer = "Sirikata.Protocol.Session.Container";
+                    self._requestField = "connect_response";
+                    self._responseField = "connect_ack";
+                    break;
+            }
+
+            self.args = args;
+        }
+
+        function SirikataProtobuf(url) {
+            var self = this;
+
+            self.__url = url + OMP.SirikataChatClient.randomUUID();
+            self.__connected = false;
+            self.__cachedCalls = []; // this is an array, since several oneway calls may be cached
+            self.__handlers = {};
+
+            // Open a connection
+            self.__ws = new WebSocket(self.__url);
+            self.__ws.onmessage = self.__handleMessage.bind(self);
+            self.__ws.onopen = self.__handleOpen.bind(self);
+            self.__ws.onclose = self.__ws.onerror = self.__handleErrorClose.bind(self);
+        }
+
+        KIARA.inherits(SirikataProtobuf, KIARA.Protocol);
+
+        SirikataProtobuf.prototype.callMethod = function(callResponse, args) {
+            var self = this;
+
+            if (self.__activeCall)
+                throw new KIARA.Error(KIARA.API_ERROR, "SirikataProtobuf doesn't support concurrent calls");
+
+            var call = new PBCallDescriptor(callResponse.getMethodName(), args);
+            call.setResult = function(resultType, result) { callResponse.setResult(result, resultType); }
+            if (call.target == 'server') {
+                self.__sendRequestMessageForCall(call);
+            } else {
+                throw new KIARA.Error(KIARA.API_ERROR, callResponse.getMethodName() + " is a client function. " +
+                    "Cannot invoke it on the server.");
+            }
+
+            if (!call.oneway)
+                self.__activeCall = call;
+        }
+
+        SirikataProtobuf.prototype.registerFunc = function(methodDescriptor, nativeMethod) {
+            var self = this;
+
+            var call = new PBCallDescriptor(methodDescriptor.methodName);
+            if (call.target == 'client') {
+                self.__handlers[call._requestContainer] = nativeMethod;
+            } else {
+                throw new KIARA.Error(KIARA.API_ERROR, methodDescriptor.methodName + " is a server function. " +
+                    "Cannot register a local handler for it.");
+            }
+        }
+
+        SirikataProtobuf.prototype.__sendRequestMessageForCall = function(call) {
+            var self = this;
+
+            // Cache call if not connected yet.
+            if (!self.__connected) {
+                self.__cachedCalls.push(call);
+                return;
+            }
+
+            // Construct request message.
+            var requestContainer = Object.create(eval(call._requestContainer + ".prototype"));
+            console.log(requestContainer);
+            // TODO: Copy data from arguments to request container.
+
+            // TODO: Send request message.
+        }
+
+        SirikataProtobuf.prototype.__handleOpen = function() {
+            var self = this;
+
+            self.__connected = true;
+            for (var i = 0; i < self.__cachedCalls.length; i++)
+                self.__sendRequestMessageForCall(self.__cachedCalls[i]);
+        }
+
+        SirikataProtobuf.prototype.__handleErrorClose = function() {
+            var self = this;
+
+            for (var i = 0; i < self.__cachedCalls.length; i++)
+                self.__cachedCalls[i].setResult('error', 'connection closed');
+            self.__cachedCalls = [];
+
+            if (self.__activeCall)
+                self.__activeCall.setResult('error', 'connection closed');
+            delete self.__activeCall;
+        }
+
+        SirikataProtobuf.prototype.__handleMessage = function(message) {
+            var self = this;
+
+            // TODO: Parse message, see self.__activeCall, then self.__handlers.
+        }
+
+        KIARA.registerProtocol('sirikata-protobuf', SirikataProtobuf);
     }
 
     return OMP;

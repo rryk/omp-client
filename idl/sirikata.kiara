@@ -1,0 +1,17 @@
+namespace * omp;
+
+[ProtocolBuffers("../scripts/sirikata/pbj/*.pbj")]
+[WebSocket("ws://yellow.cg.uni-saarland.de:7777/")]
+service sirikata {
+    [PBRequestMessage("Sirikata.Protocol.Session.Container")]
+    [PBTypeMapping("Request.connect : Args[0]")]
+    [PBToServer]
+    [Oneway]
+    void connect(SessionConnect container);
+
+    [PBRequestMessage("Sirikata.Protocol.Session.Container")]
+    [PBResponseMessage("Sirikata.Protocol.Session.Container")]
+    [PBTypeMapping("Request.connect_response : Args[0]; Response.connect_ack : Result")]
+    [PBToClient]
+    void connectResponse(SessionConnectResponse response);
+}
