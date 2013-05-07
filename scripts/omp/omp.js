@@ -4,19 +4,25 @@
         // only CommonJS-like enviroments that support module.exports,
         // like Node.
         module.exports = factory(require('logger'), require('kiara'), require('md5'), require('omp'), require('base64'),
-            require('sirikata/sirikata'), require('sirikata/protobuf'), require('sirikata/pbj'));
+            require('sirikata/sirikata'), require('sirikata/protobuf'), require('sirikata/pbj'),
+            require('sirikata/tcpsst'));
     } else if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
-        define(['logger', 'kiara', 'md5', 'base64', 'sirikata/sirikata', 'sirikata/protobuf', 'sirikata/pbj'],
-            function (logger, kiara, md5, base64, Sirikata, PROTO, PBJ) {
-                return (root.OMP = factory(logger, kiara, md5, base64, Sirikata, PROTO, PBJ));
+        define(
+            [
+                'logger', 'kiara', 'md5', 'base64', 'sirikata/sirikata', 'sirikata/protobuf', 'sirikata/pbj',
+                'sirikata/tcpsst'
+            ],
+            function (logger, kiara, md5, base64, Sirikata, PROTO, PBJ, TCPSST) {
+                return (root.OMP = factory(logger, kiara, md5, base64, Sirikata, PROTO, PBJ, TCPSST));
             }
         );
     } else {
         // Browser globals
-        root.OMP = factory(root.logger, root.KIARA, root.md5, root.base64, root.sirikata, root.PROTO, root.PBJ);
+        root.OMP = factory(root.logger, root.KIARA, root.md5, root.base64, root.sirikata, root.PROTO, root.PBJ,
+                           root.TCPSST);
     }
-} (this, function (logger, KIARA, md5, base64, Sirikata, PROTO, PBJ) {
+} (this, function (logger, KIARA, md5, base64, Sirikata, PROTO, PBJ, TCPSST) {
 
     // Notation. Methods with "_" prefix are protected, methods with "__" prefix are private, other methods are public.
 
@@ -621,25 +627,9 @@
                 return;
             }
 
-            self._addServerFunc("omp.sirikata.connect", connection);
-            connection.registerFuncImplementation("omp.sirikata.connectResponse", "...", function(connectionResponse) {
-                self.__connectionResponse = connectionResponse;
-                callback(true);
-                return;
-            });
-
-            var connect = {
-                type: 1,
-                object: OMP.SirikataChatClient.randomUUID(),
-                auth: PROTO.encodeUTF8(password),
-                loc: undefined,
-                orientation: undefined,
-                bounds: [0, 0, 0, 1],
-                query_angle: 1e-26,
-                mesh: "",
-                physics: []
-            };
-            self._call("omp.sirikata.connect", connect);
+            // FIXME: This is a hack. Context.openConnection executes the user callback as soon as protocol object is
+            // constructed which leaves us no chance to wait for asynchronous communication to initialize the protocol.
+            conn._protocol.setInitializedCallback(callback);
         });
     }
 
@@ -678,47 +668,78 @@
             var self = this;
 
             // FIXME: eventually we should be able to parse this info from the .kiara file, but now we just hardcode it.
-            // FIXME: eventually we should be able to parse type mapping string, but for now we use a hack ("_" fields).
             self.method = methodName;
             switch (methodName) {
-                case "omp.sirikata.connect":
-                    self.request = "Sirikata.Protocol.Session.Container";
-                    self.mapping = "Request.connect : Args[0]";
-                    self.oneway = true;
-                    self.target = 'server';
-                    self._requestContainer = "Sirikata.Protocol.Session.Container";
-                    self._requestProperty = "connect";
-                    break;
-                case "omp.sirikata.connectResponse":
-                    self.request = "Sirikata.Protocol.Session.Container";
-                    self.response = "Sirikata.Protocol.Session.Container";
-                    self.mapping = "Request.connect_response : Args[0]; Response.conneck_ack : Result";
-                    self.target = 'client';
-                    self._requestContainer = self._responseContainer = "Sirikata.Protocol.Session.Container";
-                    self._requestProperty = "connect_response";
-                    self._responseProperty = "connect_ack";
-                    break;
+//                case "omp.sirikata.connect":
+//                    self.request = "Sirikata.Protocol.Session.Container";
+//                    self.mapping = "Request.connect : Args[0]";
+//                    self.oneway = true;
+//                    self.target = 'server';
+//                    break;
+//                case "omp.sirikata.connectResponse":
+//                    self.request = "Sirikata.Protocol.Session.Container";
+//                    self.response = "Sirikata.Protocol.Session.Container";
+//                    self.mapping = "Request.connect_response : Args[0]; Response.conneck_ack : Result";
+//                    self.target = 'client';
+//                    break;
+                default:
+                    throw new KIARA.Error(KIARA.INVALID_OPERATION, "Method " + methodName + " is not hardcoded.");
             }
 
             self.args = args;
         }
 
+        var Ports = {
+            Session : 1,
+            Proximity : 2,
+            Location : 3,
+            TimeSync : 4,
+            Chat: 11,
+            Space : 253
+        };
+
+        var nil = '00000000-0000-0000-0000-000000000000';
+
         function SirikataProtobuf(url) {
             var self = this;
 
-            self.__url = url + OMP.SirikataChatClient.randomUUID();
+            KIARA.Protocol.call(self, "sirikata-protobuf");
+
             self.__connected = false;
             self.__cachedCalls = []; // this is an array, since several oneway calls may be cached
             self.__handlers = {};
+            self.__initialized = false;
 
             // Open a connection
-            self.__ws = new WebSocket(self.__url);
-            self.__ws.onmessage = self.__handleMessage.bind(self);
-            self.__ws.onopen = self.__handleOpen.bind(self);
-            self.__ws.onclose = self.__ws.onerror = self.__handleErrorClose.bind(self);
+            self.__socket = new TCPSST(url + OMP.SirikataChatClient.randomUUID());
+            self.__primarySubstream = self.__socket.clone();
+            self.__primarySubstream.registerListener(self.__handleMessage.bind(self));
+
+            // Initialize session.
+            self.__initializeSession(function() {
+                // Initialize SPACE and CHAT streams.
+                var SpacePort = 253;
+                var ChatPort = 11;
+                self.__initializeStream(Ports.Space, function() {
+                    self.__initializeStream(Ports.Chat, function() {
+                        self.__initialized = true;
+                        if (self.__initializedCallback) {
+                            self.__initializedCallback();
+                            delete self.__initializedCallback;
+                        }
+                    });
+                });
+            });
         }
 
         KIARA.inherits(SirikataProtobuf, KIARA.Protocol);
+
+        SirikataProtobuf.prototype.setInitializedCallback = function(callback) {
+            if (self.__initialized)
+                callback();
+            else
+                self.__initializedCallback = callback;
+        }
 
         SirikataProtobuf.prototype.callMethod = function(callResponse, args) {
             var self = this;
@@ -751,73 +772,134 @@
             }
         }
 
-
-        SirikataProtobuf.prototype.__populateFields = function(targetMessage, obj) {
+        SirikataProtobuf.prototype.__initializeSession = function(callback) {
             var self = this;
 
-            if (typeof(obj) != "object")
+            // Prepare and send Session.Connect.
+            self.__objid = OMP.SirikataChatClient.randomUUID();
+            var connectMessage = self.__createMessage("Sirikata.Protocol.Session.Container", {
+                connect: {
+                    type: 1,
+                    object: self.__objid,
+                    auth: PROTO.encodeUTF8("123"),
+                    loc: undefined,
+                    orientation: undefined,
+                    bounds: [0, 0, 0, 1],
+                    query_angle: 1e-26,
+                    mesh: "",
+                    physics: []
+                }
+            });
+            self.__sendODPMessage(self.__objid, Ports.Session, nil, Ports.Session, connectMessage);
+
+            // Wait for Session.ConnectResponse
+            self.__connectReplyCallback = function() {
+                // Send Session.ConnectAck
+                var connectAck = self.__createMessage("Sirikata.Protocol.Session.ConnectAck", {});
+                self.__sendODPMessage(self.__objid, Ports.Session, nil, Ports.Session, connectMessage);
+                callback();
+            }
+        }
+
+        SirikataProtobuf.prototype.__initializeStream = function(port, callback) {
+            // TODO: Implement
+        }
+
+        SirikataProtobuf.prototype.__createMessage = function(messageType, messageData) {
+            var self = this;
+            var message = typeof(messageType) == "string" ? eval("new " + messageType) : new messageType;
+
+            if (typeof(messageData) != "object")
                 throw new KIARA.Error(KIARA.API_ERROR, "Non object was passed to __populateFields.")
 
-            for (var propName in obj) {
-                if (obj[propName] !== undefined && targetMessage.HasProperty(propName)) {
-                    var propType = targetMessage.GetProperty(propName).type();
-                    if (propType.composite) {
-                        targetMessage[propName] = new propType;
-                        self.__populateFields(targetMessage[propName], obj[propName]);
-                    } else {
-                        targetMessage[propName] = propType.Convert(obj[propName]);
-                    }
+            for (var propName in messageData) {
+                if (messageData[propName] !== undefined && message.HasProperty(propName)) {
+                    var propType = message.GetProperty(propName).type();
+                    if (propType.composite)
+                        message[propName] = self.__createMessage(propType, messageData[propName]);
+                    else
+                        message[propName] = propType.Convert(messageData[propName]);
                 }
             }
+
+            return message;
         }
 
         SirikataProtobuf.prototype.__sendRequestMessageForCall = function(call) {
             var self = this;
 
-            // Cache call if not connected yet.
-            if (!self.__connected) {
-                self.__cachedCalls.push(call);
-                return;
-            }
+//            // Cache call if not connected yet.
+//            if (!self.__connected) {
+//                self.__cachedCalls.push(call);
+//                return;
+//            }
 
-            // Construct request message and request property.
-            var requestContainer = eval("new " + call._requestContainer);
-            var propName = call._requestProperty;
-            var propertyType = requestContainer.GetProperty(propName).type();
-            requestContainer[propName] = new propertyType;
-
-            // Copy data from arguments to request container.
-            self.__populateFields(requestContainer[propName], call.args[0])
+            // TODO: Construct request message.
+//            var requestMessage = self.__createMessage(call._requestContainer, {
+//                call._requestProperty: call.args[0]
+//            });
 
             // TODO: Send request message.
         }
 
-        SirikataProtobuf.prototype.__handleOpen = function() {
+        SirikataProtobuf.prototype.__sendODPMessage = function(src, src_port, dest, dest_port, msg) {
             var self = this;
 
-            self.__connected = true;
-            for (var i = 0; i < self.__cachedCalls.length; i++)
-                self.__sendRequestMessageForCall(self.__cachedCalls[i]);
-        }
+            // Serialized nested message.
+            var payload = new PROTO.ByteArrayStream();
+            msg.SerializeToStream(payload);
 
-        SirikataProtobuf.prototype.__handleErrorClose = function() {
+            // Wrap the message into ObjectMessage.
+            var odp_msg = new Sirikata.Protocol.Object.ObjectMessage();
+            odp_msg.source_object = src;
+            odp_msg.source_port = src_port;
+            odp_msg.dest_object = dest;
+            odp_msg.dest_port = dest_port;
+            odp_msg.unique = PROTO.I64.fromNumber(0);
+            odp_msg.payload = payload;
+
+            // Serialize ObjectMessage into byte array and send it.
+            var serialized = new PROTO.ArrayBufferStream();
+            odp_msg.SerializeToStream(serialized);
+            self.__primarySubstream.sendMessage(serialized.getUint8Array());
+        };
+
+//        SirikataProtobuf.prototype.__handleOpen = function() {
+//            var self = this;
+//
+//            self.__connected = true;
+//            for (var i = 0; i < self.__cachedCalls.length; i++)
+//                self.__sendRequestMessageForCall(self.__cachedCalls[i]);
+//        }
+
+//        SirikataProtobuf.prototype.__handleErrorClose = function() {
+//            var self = this;
+//
+//            for (var i = 0; i < self.__cachedCalls.length; i++)
+//                self.__cachedCalls[i].setResult('error', 'connection closed');
+//            self.__cachedCalls = [];
+//
+//            if (self.__activeCall)
+//                self.__activeCall.setResult('error', 'connection closed');
+//            delete self.__activeCall;
+//        }
+
+        SirikataProtobuf.prototype.__handleMessage = function(substream, data) {
             var self = this;
 
-            for (var i = 0; i < self.__cachedCalls.length; i++)
-                self.__cachedCalls[i].setResult('error', 'connection closed');
-            self.__cachedCalls = [];
+            // When data is null, this means that the connection was either closed on there was an error.
+            if (data == null) {
+                // FIXME: This doesn't consider oneway calls before the active call. They may have failed too.
+                if (self.__activeCall)
+                    self.__activeCall.setResult('error', 'connection closed');
+                delete self.__activeCall;
+                return;
+            }
 
-            if (self.__activeCall)
-                self.__activeCall.setResult('error', 'connection closed');
-            delete self.__activeCall;
-        }
+            console.log(substream, data);
 
-        SirikataProtobuf.prototype.__handleMessage = function(message) {
-            var self = this;
-
-            console.log(message);
-
-            // TODO: Parse message, see self.__activeCall, then self.__handlers.
+            // TODO: Handle Session.ConnectReply and execute self.__connectReplyCallback.
+            // TODO: Handle generic messages.
         }
 
         KIARA.registerProtocol('sirikata-protobuf', SirikataProtobuf);

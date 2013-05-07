@@ -14,14 +14,41 @@
         root.Sirikata = factory(root.PROTO, root.PBJ);
     }
 } (this, function (PROTO, PBJ) {
-    var Sirikata = {};
+    "use strict";
+    /** @suppress {duplicate}*/var Sirikata;
+    if (typeof(Sirikata)=="undefined") {Sirikata = {};}
+    if (typeof(Sirikata.Protocol)=="undefined") {Sirikata.Protocol = {};}
+    Sirikata.Protocol._PBJ_Internal="pbj-0.0.3";
 
+    Sirikata.Protocol.AggregateBoundingInfo = PROTO.Message("Sirikata.Protocol.AggregateBoundingInfo",{
+        center_offset: {
+            options: {packed:true},
+            multiplicity: PROTO.optional,
+            type: function(){return PBJ.vector3f;},
+            id: 1
+        },
+        center_bounds_radius: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.Float;},
+            id: 2
+        },
+        max_object_size: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.Float;},
+            id: 3
+        }});
+    "use strict";
+    /** @suppress {duplicate}*/var Sirikata;
     if (typeof(Sirikata)=="undefined") {Sirikata = {};}
     if (typeof(Sirikata.Protocol)=="undefined") {Sirikata.Protocol = {};}
     Sirikata.Protocol._PBJ_Internal="pbj-0.0.3";
 
     Sirikata.Protocol.Empty = PROTO.Message("Sirikata.Protocol.Empty",{
     });
+    "use strict";
+    /** @suppress {duplicate}*/var Sirikata;
     if (typeof(Sirikata)=="undefined") {Sirikata = {};}
     if (typeof(Sirikata.Protocol)=="undefined") {Sirikata.Protocol = {};}
     Sirikata.Protocol._PBJ_Internal="pbj-0.0.3";
@@ -33,12 +60,15 @@
             type: function(){return PROTO.bytes;},
             id: 1
         }});
+    "use strict";
+    /** @suppress {duplicate}*/var Sirikata;
     if (typeof(Sirikata)=="undefined") {Sirikata = {};}
     if (typeof(Sirikata.Protocol)=="undefined") {Sirikata.Protocol = {};}
     if (typeof(Sirikata.Protocol.Loc)=="undefined") {Sirikata.Protocol.Loc = {};}
     Sirikata.Protocol.Loc._PBJ_Internal="pbj-0.0.3";
 //import "TimedMotionVector.pbj";
 //import "TimedMotionQuaternion.pbj";
+//import "AggregateBoundingInfo.pbj";
 
     Sirikata.Protocol.Loc.LocationUpdate = PROTO.Message("Sirikata.Protocol.Loc.LocationUpdate",{
         object: {
@@ -53,6 +83,12 @@
             type: function(){return PROTO.uint64;},
             id: 6
         },
+        epoch: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.uint64;},
+            id: 8
+        },
         location: {
             options: {},
             multiplicity: PROTO.optional,
@@ -65,11 +101,11 @@
             type: function(){return Sirikata.Protocol.TimedMotionQuaternion;},
             id: 3
         },
-        bounds: {
-            options: {packed:true},
+        aggregate_bounds: {
+            options: {},
             multiplicity: PROTO.optional,
-            type: function(){return PBJ.boundingsphere3f;},
-            id: 4
+            type: function(){return Sirikata.Protocol.AggregateBoundingInfo;},
+            id: 10
         },
         mesh: {
             options: {},
@@ -82,6 +118,18 @@
             multiplicity: PROTO.optional,
             type: function(){return PROTO.bytes;},
             id: 7
+        },
+        parent: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PBJ.uuid;},
+            id: 9
+        },
+        index_id: {
+            options: {packed:true},
+            multiplicity: PROTO.repeated,
+            type: function(){return PROTO.uint32;},
+            id: 11
         }});
     Sirikata.Protocol.Loc.BulkLocationUpdate = PROTO.Message("Sirikata.Protocol.Loc.BulkLocationUpdate",{
         update: {
@@ -120,6 +168,12 @@
             multiplicity: PROTO.optional,
             type: function(){return PROTO.bytes;},
             id: 5
+        },
+        epoch: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.uint64;},
+            id: 6
         }});
     Sirikata.Protocol.Loc.Container = PROTO.Message("Sirikata.Protocol.Loc.Container",{
         update_request: {
@@ -128,6 +182,8 @@
             type: function(){return Sirikata.Protocol.Loc.LocationUpdateRequest;},
             id: 1
         }});
+    "use strict";
+    /** @suppress {duplicate}*/var Sirikata;
     if (typeof(Sirikata)=="undefined") {Sirikata = {};}
     if (typeof(Sirikata.Protocol)=="undefined") {Sirikata.Protocol = {};}
     if (typeof(Sirikata.Protocol.Object)=="undefined") {Sirikata.Protocol.Object = {};}
@@ -143,7 +199,7 @@
         source_port: {
             options: {},
             multiplicity: PROTO.required,
-            type: function(){return PBJ.uint16;},
+            type: function(){return PROTO.uint32;},
             id: 2
         },
         dest_object: {
@@ -155,7 +211,7 @@
         dest_port: {
             options: {},
             multiplicity: PROTO.required,
-            type: function(){return PBJ.uint16;},
+            type: function(){return PROTO.uint32;},
             id: 4
         },
         unique: {
@@ -202,12 +258,15 @@
             type: function(){return PROTO.bytes;},
             id: 10
         }});
+    "use strict";
+    /** @suppress {duplicate}*/var Sirikata;
     if (typeof(Sirikata)=="undefined") {Sirikata = {};}
     if (typeof(Sirikata.Protocol)=="undefined") {Sirikata.Protocol = {};}
     if (typeof(Sirikata.Protocol.Prox)=="undefined") {Sirikata.Protocol.Prox = {};}
     Sirikata.Protocol.Prox._PBJ_Internal="pbj-0.0.3";
 //import "TimedMotionVector.pbj";
 //import "TimedMotionQuaternion.pbj";
+//import "AggregateBoundingInfo.pbj";
 
     Sirikata.Protocol.Prox.QueryRequest = PROTO.Message("Sirikata.Protocol.Prox.QueryRequest",{
         query_angle: {
@@ -215,6 +274,40 @@
             multiplicity: PROTO.optional,
             type: function(){return PROTO.Float;},
             id: 1
+        },
+        query_max_count: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.int32;},
+            id: 2
+        },
+        query_parameters: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.bytes;},
+            id: 3
+        }});
+    Sirikata.Protocol.Prox.IndexProperties = PROTO.Message("Sirikata.Protocol.Prox.IndexProperties",{
+        id: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.uint32;},
+            id: 1
+        },
+        index_id: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.string;},
+            id: 2
+        },
+        DynamicClassification: PROTO.Enum("Sirikata.Protocol.Prox.IndexProperties.DynamicClassification",{
+            Static :1,
+            Dynamic :2	}),
+        dynamic_classification: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return Sirikata.Protocol.Prox.IndexProperties.DynamicClassification;},
+            id: 3
         }});
     Sirikata.Protocol.Prox.ObjectAddition = PROTO.Message("Sirikata.Protocol.Prox.ObjectAddition",{
         object: {
@@ -235,30 +328,66 @@
             type: function(){return Sirikata.Protocol.TimedMotionQuaternion;},
             id: 3
         },
-        bounds: {
-            options: {packed:true},
+        aggregate_bounds: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return Sirikata.Protocol.AggregateBoundingInfo;},
+            id: 10
+        },
+        seqno: {
+            options: {},
             multiplicity: PROTO.required,
-            type: function(){return PBJ.boundingsphere3f;},
-            id: 4
+            type: function(){return PROTO.uint64;},
+            id: 5
         },
         mesh: {
             options: {},
             multiplicity: PROTO.optional,
             type: function(){return PROTO.string;},
-            id: 5
+            id: 6
         },
         physics: {
             options: {},
             multiplicity: PROTO.optional,
             type: function(){return PROTO.bytes;},
-            id: 6
+            id: 7
+        },
+        parent: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PBJ.uuid;},
+            id: 8
+        },
+        ObjectType: PROTO.Enum("Sirikata.Protocol.Prox.ObjectAddition.ObjectType",{
+            Object :1,
+            Aggregate :2	}),
+        type: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return Sirikata.Protocol.Prox.ObjectAddition.ObjectType;},
+            id: 9
         }});
     Sirikata.Protocol.Prox.ObjectRemoval = PROTO.Message("Sirikata.Protocol.Prox.ObjectRemoval",{
+        RemovalType: PROTO.Enum("Sirikata.Protocol.Prox.ObjectRemoval.RemovalType",{
+            Transient :1,
+            Permanent :2	}),
         object: {
             options: {},
             multiplicity: PROTO.required,
             type: function(){return PBJ.uuid;},
             id: 1
+        },
+        seqno: {
+            options: {},
+            multiplicity: PROTO.required,
+            type: function(){return PROTO.uint64;},
+            id: 2
+        },
+        type: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return Sirikata.Protocol.Prox.ObjectRemoval.RemovalType;},
+            id: 3
         }});
     Sirikata.Protocol.Prox.ProximityUpdate = PROTO.Message("Sirikata.Protocol.Prox.ProximityUpdate",{
         addition: {
@@ -272,6 +401,12 @@
             multiplicity: PROTO.repeated,
             type: function(){return Sirikata.Protocol.Prox.ObjectRemoval;},
             id: 2
+        },
+        index_properties: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return Sirikata.Protocol.Prox.IndexProperties;},
+            id: 3
         }});
     Sirikata.Protocol.Prox.ProximityResults = PROTO.Message("Sirikata.Protocol.Prox.ProximityResults",{
         t: {
@@ -286,6 +421,8 @@
             type: function(){return Sirikata.Protocol.Prox.ProximityUpdate;},
             id: 2
         }});
+    "use strict";
+    /** @suppress {duplicate}*/var Sirikata;
     if (typeof(Sirikata)=="undefined") {Sirikata = {};}
     if (typeof(Sirikata.Protocol)=="undefined") {Sirikata.Protocol = {};}
     if (typeof(Sirikata.Protocol.Session)=="undefined") {Sirikata.Protocol.Session = {};}
@@ -293,10 +430,53 @@
 //import "TimedMotionVector.pbj";
 //import "TimedMotionQuaternion.pbj";
 
+    Sirikata.Protocol.Session.VersionInfo = PROTO.Message("Sirikata.Protocol.Session.VersionInfo",{
+        name: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.string;},
+            id: 1
+        },
+        version: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.string;},
+            id: 2
+        },
+        major: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.int32;},
+            id: 3
+        },
+        minor: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.int32;},
+            id: 4
+        },
+        revision: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.int32;},
+            id: 5
+        },
+        vcs_version: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.string;},
+            id: 6
+        }});
     Sirikata.Protocol.Session.Connect = PROTO.Message("Sirikata.Protocol.Session.Connect",{
         ConnectionType: PROTO.Enum("Sirikata.Protocol.Session.Connect.ConnectionType",{
             Fresh :1,
             Migration :2	}),
+        version: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return Sirikata.Protocol.Session.VersionInfo;},
+            id: 11
+        },
         type: {
             options: {},
             multiplicity: PROTO.required,
@@ -339,6 +519,18 @@
             type: function(){return PROTO.Float;},
             id: 6
         },
+        query_max_count: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.int32;},
+            id: 10
+        },
+        query_parameters: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.bytes;},
+            id: 12
+        },
         mesh: {
             options: {},
             multiplicity: PROTO.optional,
@@ -350,12 +542,30 @@
             multiplicity: PROTO.optional,
             type: function(){return PROTO.bytes;},
             id: 9
+        },
+        oh_name: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.bytes;},
+            id: 13
+        },
+        zernike: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.string;},
+            id: 14
         }});
     Sirikata.Protocol.Session.ConnectResponse = PROTO.Message("Sirikata.Protocol.Session.ConnectResponse",{
         Response: PROTO.Enum("Sirikata.Protocol.Session.ConnectResponse.Response",{
             Success :1,
             Redirect :2,
             Error :3	}),
+        version: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return Sirikata.Protocol.Session.VersionInfo;},
+            id: 8
+        },
         response: {
             options: {},
             multiplicity: PROTO.required,
@@ -420,7 +630,99 @@
             type: function(){return PROTO.string;},
             id: 2
         }});
+    Sirikata.Protocol.Session.Coordinate = PROTO.Message("Sirikata.Protocol.Session.Coordinate",{
+        CoordinationType: PROTO.Enum("Sirikata.Protocol.Session.Coordinate.CoordinationType",{
+            Add :1,
+            Remove :2,
+            MigrateTo :3,
+            MigrateFrom :4,
+            MigrateReq :5,
+            Ready :6,
+            Ack :7	}),
+        type: {
+            options: {},
+            multiplicity: PROTO.required,
+            type: function(){return Sirikata.Protocol.Session.Coordinate.CoordinationType;},
+            id: 1
+        },
+        object: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PBJ.uuid;},
+            id: 2
+        },
+        entity: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PBJ.uuid;},
+            id: 3
+        },
+        oh_name: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.string;},
+            id: 4
+        },
+        migrate_capacity: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.int32;},
+            id: 5
+        },
+        migrate_threshold: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.int32;},
+            id: 6
+        }});
+    Sirikata.Protocol.Session.OHMigration = PROTO.Message("Sirikata.Protocol.Session.OHMigration",{
+        MigrationType: PROTO.Enum("Sirikata.Protocol.Session.OHMigration.MigrationType",{
+            Object :1,
+            Entity :2,
+            Ack :3	}),
+        type: {
+            options: {},
+            multiplicity: PROTO.required,
+            type: function(){return Sirikata.Protocol.Session.OHMigration.MigrationType;},
+            id: 1
+        },
+        id: {
+            options: {},
+            multiplicity: PROTO.required,
+            type: function(){return PBJ.uuid;},
+            id: 2
+        },
+        oh_name: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.string;},
+            id: 3
+        },
+        password: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.string;},
+            id: 4
+        },
+        reason: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.string;},
+            id: 5
+        },
+        objects: {
+            options: {},
+            multiplicity: PROTO.repeated,
+            type: function(){return PBJ.uuid;},
+            id: 6
+        }});
     Sirikata.Protocol.Session.Container = PROTO.Message("Sirikata.Protocol.Session.Container",{
+        seqno: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return PROTO.uint64;},
+            id: 8
+        },
         connect: {
             options: {},
             multiplicity: PROTO.optional,
@@ -450,7 +752,21 @@
             multiplicity: PROTO.optional,
             type: function(){return Sirikata.Protocol.Session.Disconnect;},
             id: 5
+        },
+        coordinate: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return Sirikata.Protocol.Session.Coordinate;},
+            id: 6
+        },
+        oh_migration: {
+            options: {},
+            multiplicity: PROTO.optional,
+            type: function(){return Sirikata.Protocol.Session.OHMigration;},
+            id: 7
         }});
+    "use strict";
+    /** @suppress {duplicate}*/var Sirikata;
     if (typeof(Sirikata)=="undefined") {Sirikata = {};}
     if (typeof(Sirikata.Protocol)=="undefined") {Sirikata.Protocol = {};}
     if (typeof(Sirikata.Protocol.SST)=="undefined") {Sirikata.Protocol.SST = {};}
@@ -499,7 +815,7 @@
         lsid: {
             options: {},
             multiplicity: PROTO.required,
-            type: function(){return PBJ.uint16;},
+            type: function(){return PROTO.uint32;},
             id: 1
         },
         type: {
@@ -523,25 +839,25 @@
         src_port: {
             options: {},
             multiplicity: PROTO.required,
-            type: function(){return PBJ.uint16;},
+            type: function(){return PROTO.uint32;},
             id: 5
         },
         dest_port: {
             options: {},
             multiplicity: PROTO.required,
-            type: function(){return PBJ.uint16;},
+            type: function(){return PROTO.uint32;},
             id: 6
         },
         psid: {
             options: {},
             multiplicity: PROTO.optional,
-            type: function(){return PBJ.uint16;},
+            type: function(){return PROTO.uint32;},
             id: 7
         },
         rsid: {
             options: {},
             multiplicity: PROTO.optional,
-            type: function(){return PBJ.uint16;},
+            type: function(){return PROTO.uint32;},
             id: 8
         },
         bsn: {
@@ -556,6 +872,8 @@
             type: function(){return PROTO.bytes;},
             id: 10
         }});
+    "use strict";
+    /** @suppress {duplicate}*/var Sirikata;
     if (typeof(Sirikata)=="undefined") {Sirikata = {};}
     if (typeof(Sirikata.Protocol)=="undefined") {Sirikata.Protocol = {};}
     Sirikata.Protocol._PBJ_Internal="pbj-0.0.3";
@@ -579,6 +897,8 @@
             type: function(){return PBJ.quaternion;},
             id: 3
         }});
+    "use strict";
+    /** @suppress {duplicate}*/var Sirikata;
     if (typeof(Sirikata)=="undefined") {Sirikata = {};}
     if (typeof(Sirikata.Protocol)=="undefined") {Sirikata.Protocol = {};}
     Sirikata.Protocol._PBJ_Internal="pbj-0.0.3";
@@ -602,6 +922,8 @@
             type: function(){return PBJ.vector3f;},
             id: 3
         }});
+    "use strict";
+    /** @suppress {duplicate}*/var Sirikata;
     if (typeof(Sirikata)=="undefined") {Sirikata = {};}
     if (typeof(Sirikata.Protocol)=="undefined") {Sirikata.Protocol = {};}
     Sirikata.Protocol._PBJ_Internal="pbj-0.0.3";
