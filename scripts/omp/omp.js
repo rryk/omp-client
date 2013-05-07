@@ -140,7 +140,7 @@
         if (!self._sessionID || !self._agentID || !self._circuitCode)
             throw new KIARA.Error(KIARA.API_ERROR, "Login response missing to connect. Please login first.");
 
-        var connection = self.__regionConnection = self.__context.openConnection(
+        var connection = self.__regionConnection = self._context.openConnection(
             REMOTE_IDL_URL_PREFIX + "interface.kiara",
             function(err, conn) {
                 if (err)
