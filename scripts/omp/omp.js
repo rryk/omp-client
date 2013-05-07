@@ -687,7 +687,7 @@
                     self.oneway = true;
                     self.target = 'server';
                     self._requestContainer = "Sirikata.Protocol.Session.Container";
-                    self._requestField = "connect";
+                    self._requestProperty = "connect";
                     break;
                 case "omp.sirikata.connectResponse":
                     self.request = "Sirikata.Protocol.Session.Container";
@@ -695,8 +695,8 @@
                     self.mapping = "Request.connect_response : Args[0]; Response.conneck_ack : Result";
                     self.target = 'client';
                     self._requestContainer = self._responseContainer = "Sirikata.Protocol.Session.Container";
-                    self._requestField = "connect_response";
-                    self._responseField = "connect_ack";
+                    self._requestProperty = "connect_response";
+                    self._responseProperty = "connect_ack";
                     break;
             }
 
@@ -751,6 +751,26 @@
             }
         }
 
+
+        SirikataProtobuf.prototype.__populateFields = function(targetMessage, obj) {
+            var self = this;
+
+            if (typeof(obj) != "object")
+                throw new KIARA.Error(KIARA.API_ERROR, "Non object was passed to __populateFields.")
+
+            for (var propName in obj) {
+                if (obj[propName] !== undefined && targetMessage.HasProperty(propName)) {
+                    var propType = targetMessage.GetProperty(propName).type();
+                    if (propType.composite) {
+                        targetMessage[propName] = new propType;
+                        self.__populateFields(targetMessage[propName], obj[propName]);
+                    } else {
+                        targetMessage[propName] = propType.Convert(obj[propName]);
+                    }
+                }
+            }
+        }
+
         SirikataProtobuf.prototype.__sendRequestMessageForCall = function(call) {
             var self = this;
 
@@ -760,10 +780,14 @@
                 return;
             }
 
-            // Construct request message.
-            var requestContainer = Object.create(eval(call._requestContainer + ".prototype"));
-            console.log(requestContainer);
-            // TODO: Copy data from arguments to request container.
+            // Construct request message and request property.
+            var requestContainer = eval("new " + call._requestContainer);
+            var propName = call._requestProperty;
+            var propertyType = requestContainer.GetProperty(propName).type();
+            requestContainer[propName] = new propertyType;
+
+            // Copy data from arguments to request container.
+            self.__populateFields(requestContainer[propName], call.args[0])
 
             // TODO: Send request message.
         }
@@ -790,6 +814,8 @@
 
         SirikataProtobuf.prototype.__handleMessage = function(message) {
             var self = this;
+
+            console.log(message);
 
             // TODO: Parse message, see self.__activeCall, then self.__handlers.
         }
