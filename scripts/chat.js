@@ -8,7 +8,6 @@ requirejs.config({
     //the paths config could be for a directory.
     paths: {
         omp: '../omp',
-        sirikata: '../sirikata'
     },
     shim: {
         'logger': {
@@ -30,6 +29,15 @@ requirejs.config({
                     "encode": this.encode64,
                     "decode": this.decode64
                 }
+            }
+        },
+        'katajs': {
+            init: function() {
+                var exports = this.Kata;
+                //exports.Protocol = this.Sirikata.Protocol;
+                exports.PROTO = this.PROTO;
+                exports.Math = this.Math;
+                return exports;
             }
         }
     },
@@ -163,5 +171,4 @@ function(OMP, $, base64) {
     });
     $("#loginBtn").removeAttr("disabled");
 
-    $("#connType").change(updateLoginInterface);
 });

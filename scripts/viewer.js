@@ -8,7 +8,6 @@ requirejs.config({
     //the paths config could be for a directory.
     paths: {
         omp: '../omp',
-        sirikata: '../sirikata'
     },
     shim: {
         'logger': {

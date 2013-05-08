@@ -1461,7 +1461,7 @@
                 break;
             case "sirikata.kiara":
                 protocolName = "sirikata-protobuf";
-                protocolUrl = 'ws://' + location.hostname + ':7777/';
+                protocolUrl = 'sirikata://' + location.hostname + ':7777/';
                 break;
             default:
                 handleError(new KIARAError(KIARA.UNSUPPORTED_FEATURE, "IDL " + url + " is not hard-coded."));
