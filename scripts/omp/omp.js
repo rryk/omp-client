@@ -48,6 +48,33 @@
         self._registerProtocols();
         self._context = KIARA.createContext();
         self.__server = {};
+        self.__pendingUnreliableCallIndex = -1;
+        self.__pendingCalls = [];
+        self.__lastCallTime = null;
+        self.__callDeltaTime = 100;
+        self.__pendingTimerID = null;
+    }
+
+    OMP.Client.prototype._canCallNow = function() {
+        var self = this;
+        return self.__pendingTimerID === null;
+    }
+
+    OMP.Client.prototype.__processPendingCalls = function() {
+        var self = this;
+        if (self.__pendingCalls.length === 0) {
+            self.__pendingTimerID = null;
+            return;
+        }
+
+        var args = self.__pendingCalls.shift();
+        if (self.__pendingUnreliableCallIndex >= 0)
+            --self.__pendingUnreliableCallIndex;
+
+        self.__lastCallTime = Date.now();
+        self._call.apply(self, args);
+
+        self.__pendingTimerID = window.setTimeout(function() { self.__processPendingCalls(); }, self.__callDeltaTime);
     }
 
     // Abstract. Registers protocols necessary for a given server.
@@ -73,6 +100,35 @@
 
         // Call the function.
         return self.__server[functionName].apply(null, args);
+    }
+
+    // Call a function |functionName| with |arguments|.
+    OMP.Client.prototype._callLater = function(arg0 /* ... arguments ... */) {
+        var self = this;
+
+        // Remove function name from the arguments.
+        var args = Array.prototype.slice.call(arguments);
+        var stringIsFirstArg = Object.prototype.toString.call(arg0).slice(8, -1) === "String";
+        if (stringIsFirstArg)
+            var options = {};
+        else {
+            var options = options || {};
+            args.splice(0, 1);
+        }
+
+        if (options.reliable)
+            self.__pendingCalls.push(args);
+        else {
+            if (self.__pendingUnreliableCallIndex < 0) {
+                self.__pendingUnreliableCallIndex = self.__pendingCalls.length;
+                self.__pendingCalls.push(args);
+            } else {
+                // replace unreliable call
+                self.__pendingCalls[self.__pendingUnreliableCallIndex] = args;
+            }
+        }
+        if (self._canCallNow())
+            self.__processPendingCalls();
     }
 
     //  =============================== OpenSIMClient ===============================
@@ -570,15 +626,18 @@
                                                                   options) {
         options = options || {};
         var self = this;
-        if (self.__tooFastStateUpdates && !options.reliable)
-          return;
 
-        self.__tooFastStateUpdates = true;
+//        if (self.__tooFastStateUpdates && !options.reliable) {
+//            console.log("IGNORED SEND");
+//            return;
+//        }
+//
+//        self.__tooFastStateUpdates = true;
 
         if (!controls)
           controls = 0;
 
-        self._call("omp.movement.agentUpdate", {
+        self._callLater("omp.movement.agentUpdate", {
             AgentData: {
                 AgentID: self._agentID,
                 BodyRotation: {X: rotation.x, Y: rotation.y, Z: rotation.z, W: rotation.w},
@@ -595,7 +654,7 @@
             }
         });
 
-        setTimeout(function() { self.__tooFastStateUpdates = false }, 100);
+//        setTimeout(function() { self.__tooFastStateUpdates = false }, 100);
     }
 
     //  =============================== SirikataChatClient ===============================

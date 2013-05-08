@@ -244,7 +244,7 @@
 
     cc.updateKeyMovement = function(){
         for (var kc in this.currentlyPressedKeys) {
-            //this.moveWithKey(kc*1); //*1 -> to make its a number now
+            this.moveWithKey(kc+0); //+0 -> to make its a number now
         }
     };
 
@@ -319,6 +319,28 @@
         }
     };
 
+    cc.moveWithKey = function(kc) {
+        switch (kc) {
+            case XMOT.KEY_A :
+                xml3dGraphics.rotateCameraLeftAndRight(10 * Math.PI/180);
+                break;
+            case XMOT.KEY_D :
+                console.log("press D");
+                xml3dGraphics.rotateCameraLeftAndRight(-10 * Math.PI/180);
+                break;
+        }
+
+        console.log("SEND PRESS "+this.ompControls);
+        this.client.setViewerState(
+            xml3dGraphics.getCameraPosition(),
+            xml3dGraphics.getCameraRotation(),
+            {x: 0, y: 1, z:0}, // camera up
+            {x: 0, y:-1, z:0}, // camera left
+            {x: 0, y: 0, z:1}, // camera at
+            this.ompControls // controls
+        );
+    }
+
     cc.keyPressed = function(kc) {
         var changed = true;
         switch (kc) {
@@ -352,7 +374,8 @@
                 {x: 0, y:1, z:0}, // camera up
                 {x: 0, y:-1, z:0}, // camera left
                 {x: 0, y: 0, z:1}, // camera at
-                this.ompControls // controls
+                this.ompControls, // controls
+                {reliable: true}
             );
         }
         return changed;
