@@ -566,9 +566,11 @@
     //   |controls| - a number describing user controls, documentation: http://goo.gl/UplNa,
     //                used in OpenSim to run scripts triggered by user actions, may be omitted
     OMP.OpenSIMViewerClient.prototype.setViewerState = /*void*/ function(position, rotation, cameraUp,
-                                                                  cameraLeft, cameraAt, controls) {
+                                                                  cameraLeft, cameraAt, controls,
+                                                                  options) {
+        options = options || {};
         var self = this;
-        if (self.__tooFastStateUpdates)
+        if (self.__tooFastStateUpdates && !options.reliable)
           return;
 
         self.__tooFastStateUpdates = true;

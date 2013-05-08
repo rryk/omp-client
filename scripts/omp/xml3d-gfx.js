@@ -133,7 +133,12 @@
         this._transform.translation.x = position.x;
         this._transform.translation.y = position.y;
         this._transform.translation.z = position.z;
-        this._transform.rotation.setQuaternion(new XML3DVec3(rotation.x, rotation.y, rotation.z), rotation.w);
+
+        if (rotation.constructor === window.XML3DRotation)
+            this._transform.rotation.set(rotation);
+        else
+            this._transform.rotation.setQuaternion(new XML3DVec3(rotation.x, rotation.y, rotation.z), rotation.w);
+
         this._transform.scale.x = scale.x;
         this._transform.scale.y = scale.y;
         this._transform.scale.z = scale.z;
@@ -165,13 +170,13 @@
                 return "Box(min=" + xyzToString(box.min) + ", max=" + xyzToString(box.max) + ")";
             }
 
-            console.log("MODEL BBOX "+boxToString(bbox));
+            //console.log("MODEL BBOX "+boxToString(bbox));
 
-            console.log(
-                "ID "+this._id+" GET POS.Z "+bboxPosition.z+" DIFF TO GROUND "+(bboxPosition.z-22)+"\n"+
-                " APPROX OMP MODEL HEIGHT "+((bboxPosition.z-22)/bboxScale.z)+"\n"+
-                "SCALE Z "+bboxScale.z+" SCALE Z/2 "+(bboxScale.z/2)+" MODEL BBOX SIZE Z "+bboxSize.z+"\n"+
-                " MODEL BBOX MIN Z "+bbox.min.z+" MODEL BBOX MAX Z "+bbox.max.z);
+            //console.log(
+            //    "ID "+this._id+" GET POS.Z "+bboxPosition.z+" DIFF TO GROUND "+(bboxPosition.z-22)+"\n"+
+            //    " APPROX OMP MODEL HEIGHT "+((bboxPosition.z-22)/bboxScale.z)+"\n"+
+            //    "SCALE Z "+bboxScale.z+" SCALE Z/2 "+(bboxScale.z/2)+" MODEL BBOX SIZE Z "+bboxSize.z+"\n"+
+            //    " MODEL BBOX MIN Z "+bbox.min.z+" MODEL BBOX MAX Z "+bbox.max.z);
 
             this._modelTransform.scale.x = 1 / bboxSize.x;
             this._modelTransform.scale.y = 1 / bboxSize.y;
@@ -189,8 +194,11 @@
                 this._transform.translation.z = bboxPosition.z;
             }
             if (bboxRotation) {
-                this._transform.rotation.setQuaternion(
-                    new XML3DVec3(bboxRotation.x, bboxRotation.y, bboxRotation.z), bboxRotation.w);
+                if (bboxRotation.constructor === window.XML3DRotation)
+                    this._transform.rotation.set(bboxRotation);
+                else
+                    this._transform.rotation.setQuaternion(
+                        new XML3DVec3(bboxRotation.x, bboxRotation.y, bboxRotation.z), bboxRotation.w);
             }
             if (bboxScale) {
                 this._transform.scale.x = bboxScale.x;
@@ -300,11 +308,13 @@
     }
 
     // Initializes XML3D scene in the |container|.
-    XML3DGraphics.prototype.initScene = /*void*/ function(/*Element*/ container) {
+    XML3DGraphics.prototype.initScene = /*void*/ function(/*Element*/ container, options) {
 //        if (container.namespaceURI == XML3D.xml3dNS && container.nodeName.toLowerCase() == "xml3d") {
 //            this._scene = container;
 //            return;
 //        }
+
+        options = options || {};
 
         this._scene = XML3D.createElement("xml3d");
         this._scene.setAttribute("id", "sceneRoot");
@@ -316,20 +326,36 @@
 
         this._cameraXfm = XML3D.createElement("transform");
         this._cameraXfm.setAttribute("id", "cameraXfm");
-        this._cameraXfm.setAttribute("translation", "139.3983917236328 180.59353637695312 39.621944427490234");
-        this._cameraXfm.setAttribute("rotation", "-0.05949794501066208 -0.6299545168876648 -0.7743496298789978 3.4618804122460576");
+
+        this._cameraOffsetXfm = XML3D.createElement("transform");
+        this._cameraOffsetXfm.setAttribute("id", "cameraOffsetXfm");
+
+        //this._cameraXfm.setAttribute("translation", "139.3983917236328 180.59353637695312 39.621944427490234");
+        //this._cameraXfm.setAttribute("rotation", "-0.05949794501066208 -0.6299545168876648 -0.7743496298789978 3.4618804122460576");
 
         this._defs.appendChild(this._cameraXfm);
+        this._defs.appendChild(this._cameraOffsetXfm);
+
+        this._view = XML3D.createElement("view");
+        this._view.setAttribute("id", "view");
+
+        this._viewOffsetGroup = XML3D.createElement("group");
+        this._viewOffsetGroup.setAttribute("id", "viewOffsetGroup");
+        this._viewOffsetGroup.setAttribute("transform", "#cameraOffsetXfm");
+        this._viewOffsetGroup.appendChild(this._view);
 
         this._viewGroup = XML3D.createElement("group");
         this._viewGroup.setAttribute("id", "viewGroup");
         this._viewGroup.setAttribute("transform", "#cameraXfm");
+        this._viewGroup.appendChild(this._viewOffsetGroup);
 
         this._scene.appendChild(this._viewGroup);
 
-        this._view = XML3D.createElement("view");
-        this._view.setAttribute("id", "view");
-        this._viewGroup.appendChild(this._view);
+        // setup OpenSIM coordinate system for camera
+        var X = new XML3DRotation(new XML3DVec3(1,0,0), Math.PI/180*90);
+        var Y = new XML3DRotation(new XML3DVec3(0,1,0), -Math.PI/180*90);
+        this._view.orientation.set(X.multiply(Y));
+        this._view.setAttribute("position", "0 0 0");
 
         // FIXME: this should be done on response to LayerData message, but we just hardcode flat
         // terrain at height 22.
@@ -356,8 +382,10 @@
 //            controller.doAction({x: e.clientX, y: e.clientY});
 //        }, false);
 
-        var controller = new XMOT.CameraController("viewGroup", "sceneRoot", null, false);
-        controller.activate();
+        if (options.enableCameraController) {
+            var controller = new XMOT.CameraController("viewGroup", "sceneRoot", null, false);
+            controller.activate();
+        }
 
         var that = this;
         this._cameraXfm.addEventListener("DOMAttrModified", function (ev) {
@@ -375,6 +403,25 @@
 //        window.addEventListener("mousemove", function(e) {
 //            controller.doAction({x: e.clientX, y: e.clientY});
 //        }, false);
+    }
+
+    function rotate(dest, orientation) {
+        var destination = new XML3DRotation(dest, undefined, undefined);
+        destination = destination.multiply( orientation );
+        dest.set(destination);
+    }
+
+    XML3DGraphics.prototype.rotateCameraLeftAndRight = function(angle) {
+        //rotate up/down befor rotating sidewards, this prevends from rolling
+        var angleUp = 0;
+        //rotate( this._cameraXfm.rotation, new XML3DRotation(new XML3DVec3(1, 0, 0), -angleUp) );
+        rotate( this._cameraXfm.rotation, new XML3DRotation(new XML3DVec3(0, 0, 1), angle) );
+        //and rotate up/down again
+        //rotate( this._cameraXfm.rotation, new XML3DRotation(new XML3DVec3(1, 0, 0), angleUp) );
+    }
+
+    XML3DGraphics.prototype.getXml3dId = function() {
+        return this._scene.getAttribute("id");
     }
 
     XML3DGraphics.prototype.setCameraListener = function(listener) {
@@ -399,7 +446,24 @@
             this._cameraXfm.translation.z = position.z;
         }
         if (rotation) {
-            this._cameraXfm.rotation.setQuaternion(new XML3DVec3(rotation.x, rotation.y, rotation.z), rotation.w);
+            if (rotation.constructor === window.XML3DRotation)
+                this._cameraXfm.rotation.set(rotation);
+            else
+                this._cameraXfm.rotation.setQuaternion(new XML3DVec3(rotation.x, rotation.y, rotation.z), rotation.w);
+        }
+    }
+
+    XML3DGraphics.prototype.setCameraOffset = function(position, rotation) {
+        if (position) {
+            this._cameraOffsetXfm.translation.x = position.x;
+            this._cameraOffsetXfm.translation.y = position.y;
+            this._cameraOffsetXfm.translation.z = position.z;
+        }
+        if (rotation) {
+            if (rotation.constructor === window.XML3DRotation)
+                this._cameraOffsetXfm.rotation.set(rotation);
+            else
+                this._cameraOffsetXfm.rotation.setQuaternion(new XML3DVec3(rotation.x, rotation.y, rotation.z), rotation.w);
         }
     }
 
