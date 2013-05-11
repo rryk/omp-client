@@ -1,3 +1,7 @@
+body, html {
+    height: 100%;
+}
+
 #loginForm {
     padding: 5px;
     margin: 0px;
@@ -11,14 +15,23 @@
 
 #chatInterface {
     display: none;
+    height: 100%;
+    width: 100%;
 }
 
 #log {
-    height: 500px; background-color: black; color: white; font-family: monospace;
+    background-color: black;
+    color: white;
+    font-family: monospace;
+    height: 100%;
+    width: 100%;
 }
 
 #say {
     width: 100%;
+    position: relative;
+    top: -4px;
+    left: -1px;
 }
 
 #loginBtn {
