@@ -4,12 +4,14 @@
         // only CommonJS-like enviroments that support module.exports,
         // like Node.
         module.exports = factory(
-            require('logger'), require('kiara'), require('md5'), require('omp'), require('base64'), require('katajs'));
+            require('logger'), require('kiara'), require('md5'), require('base64'), require('katajs/katajs.compiled'));
     } else if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
-        define(['logger', 'kiara', 'md5', 'base64', 'katajs'], function (logger, kiara, md5, base64, Kata) {
-            return (root.OMP = factory(logger, kiara, md5, base64, Kata));
-        });
+        define(['logger', 'kiara', 'md5', 'base64', 'katajs/katajs.compiled'],
+            function (logger, kiara, md5, base64, Kata) {
+                return (root.OMP = factory(logger, kiara, md5, base64, Kata));
+            }
+        );
     } else {
         // Browser globals
         root.OMP = factory(root.logger, root.KIARA, root.md5, root.base64, root.Kata);
@@ -674,15 +676,25 @@
     OMP.SirikataChatClient.prototype.connect = function(login, password, callback) {
         var self = this;
 
+        self.__login = login;
+
         var connection = self._context.openConnection(REMOTE_IDL_URL_PREFIX + "sirikata.kiara", function(err, conn) {
             if (err) {
                 logger.error(err);
                 return;
             }
 
-            // FIXME: This is a hack. Context.openConnection executes the user callback as soon as protocol object is
-            // constructed which leaves us no chance to wait for asynchronous communication to initialize the protocol.
-            conn._protocol.setInitializedCallback(callback);
+            // We assume that SirikataProtobuf protocol is used. We need to setup connected callback that is executed
+            // after asynchronous connection setup and pass user login necessary for correct display of the user name
+            // in chat.
+            var protocol = conn.getProtocol();
+            protocol.setConnectedCallback(callback);
+            protocol.setUserLogin(self.__login);
+
+            conn.registerFuncImplementation("sirikata.chat.receive", "...", self.__receiveHandler.bind(self));
+            conn.registerFuncImplementation("sirikata.chat.exit", "...", self.__exitHandler.bind(self));
+            conn.registerFuncImplementation("sirikata.chat.enter", "...", self.__enterHandler.bind(self));
+            self._addServerFunc("sirikata.chat.say", conn);
         });
     }
 
@@ -690,57 +702,36 @@
     OMP.SirikataChatClient.prototype.sendMessage = function(message) {
         var self = this;
 
-    }
-
-    OMP.SirikataChatClient.randomUUID = function() {
-        var chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-        var uuid = [];
-
-        // rfc4122, version 4 form
-        var r;
-
-        // rfc4122 requires these characters
-        uuid[8] = uuid[13] = uuid[18] = uuid[23] = '-';
-        uuid[14] = '4';
-
-        // Fill in random data.  At i==19 set the high bits of clock sequence as
-        // per rfc4122, sec. 4.1.5
-        for (var i = 0; i < 36; i++) {
-            if (!uuid[i]) {
-                r = 0 | Math.random()*16;
-                uuid[i] = chars[(i == 19) ? (r & 0x3) | 0x8 : r];
-            }
-        }
-
-        return uuid.join('');
+        self._call("sirikata.chat.say", message);
+        self.__onMessage(self.__login, message);
     }
 
     // Registers Sirikata Protocol Buffers protocol
     OMP.SirikataChatClient.prototype._registerProtocols = function() {
-        function PBCallDescriptor(methodName, args) {
-            var self = this;
-
-            // FIXME: eventually we should be able to parse this info from the .kiara file, but now we just hardcode it.
-            self.method = methodName;
-            switch (methodName) {
-//                case "omp.sirikata.connect":
-//                    self.request = "Sirikata.Protocol.Session.Container";
-//                    self.mapping = "Request.connect : Args[0]";
-//                    self.oneway = true;
-//                    self.target = 'server';
-//                    break;
-//                case "omp.sirikata.connectResponse":
-//                    self.request = "Sirikata.Protocol.Session.Container";
-//                    self.response = "Sirikata.Protocol.Session.Container";
-//                    self.mapping = "Request.connect_response : Args[0]; Response.conneck_ack : Result";
-//                    self.target = 'client';
-//                    break;
-                default:
-                    throw new KIARA.Error(KIARA.INVALID_OPERATION, "Method " + methodName + " is not hardcoded.");
-            }
-
-            self.args = args;
-        }
+//        function PBCallDescriptor(methodName, args) {
+//            var self = this;
+//
+//            // FIXME: eventually we should be able to parse this info from the .kiara file, but now we just hardcode it.
+//            self.method = methodName;
+//            switch (methodName) {
+////                case "omp.sirikata.connect":
+////                    self.request = "Sirikata.Protocol.Session.Container";
+////                    self.mapping = "Request.connect : Args[0]";
+////                    self.oneway = true;
+////                    self.target = 'server';
+////                    break;
+////                case "omp.sirikata.connectResponse":
+////                    self.request = "Sirikata.Protocol.Session.Container";
+////                    self.response = "Sirikata.Protocol.Session.Container";
+////                    self.mapping = "Request.connect_response : Args[0]; Response.conneck_ack : Result";
+////                    self.target = 'client';
+////                    break;
+//                default:
+//                    throw new KIARA.Error(KIARA.INVALID_OPERATION, "Method " + methodName + " is not hardcoded.");
+//            }
+//
+//            self.args = args;
+//        }
 
 //        var Ports = {
 //            Session : 1,
@@ -758,92 +749,113 @@
 
             KIARA.Protocol.call(self, "sirikata-protobuf");
 
-//            // Initialize KataJS
-//            Kata.scriptRoot = "scripts/";
-//            self.__mt = new Kata.MainThread("MyScript.js", "MyScript", { space: url });
-//            self.__mt.getChannel().registerListener(function(message) {
-//                console.log("message from MainThread", message);
-//            });
+            self.__url = url;
 
-//            self.__connected = false;
-//            self.__cachedCalls = []; // this is an array, since several oneway calls may be cached
             self.__handlers = {};
-            self.__initialized = false;
-//
-//            // Open a connection
-//            self.__socket = new TCPSST(url + OMP.SirikataChatClient.randomUUID());
-//            self.__primarySubstream = self.__socket.clone();
-//            self.__primarySubstream.registerListener(self.__handleMessage.bind(self));
-//
-//            // Initialize session.
-//            self.__initializeSession(function() {
-//                // Initialize SPACE and CHAT streams.
-//                var SpacePort = 253;
-//                var ChatPort = 11;
-//                self.__initializeStream(Ports.Space, function() {
-//                    self.__initializeStream(Ports.Chat, function() {
-//                        self.__initialized = true;
-//                        if (self.__initializedCallback) {
-//                            self.__initializedCallback(true);
-//                            delete self.__initializedCallback;
-//                        }
-//                    });
-//                });
-//            });
+            self.__connected = false;
         }
 
         KIARA.inherits(SirikataProtobuf, KIARA.Protocol);
 
-        // Interface for KataJS
+        SirikataProtobuf.prototype.__initKataJS = function(url) {
+            var self = this;
 
-        SirikataProtobuf.prototype.aliasIDs = function() {
-            console.log("aliasID", arguments);
+            // Initialize KataJS
+            Kata.scriptRoot = "/projects/omp-client/scripts/";
+            var mt = new Kata.MainThread("MyScript.js", "MyScript", {
+                visual: {mesh: ""},
+                space: url,
+                    name: self.__login,
+                loc: {scale: [0, 0, 0, 1]}
+            });
+            self.channel = mt.getChannel();
+            self.channel.registerListener(self.__handleMessageFromKataJS.bind(self));
         }
 
-        SirikataProtobuf.prototype.connectionResponse = function() {
-            console.log("connectionResponse", arguments);
+        SirikataProtobuf.prototype.__handleMessageFromKataJS = function (channel, message) {
+            var self = this;
+
+            if (message.__gui) {
+                var event = message.__gui.event;
+                if (event.action == "connectStatus") {
+                    self.__connected = true;
+                    self.__connectedStatus = event.status;
+                    if (self.__connectedCallback)
+                        self.__connectedCallback(event.status);
+                } else if (event.action == "say") {
+                    if (self.__handlers["sirikata.chat.receive"]) {
+                        var handler = self.__handlers["sirikata.chat.receive"];
+                        handler(event.name, event.msg);
+                    }
+                } else if (event.action == "exit") {
+                    if (self.__handlers["sirikata.chat.exit"]) {
+                        var handler = self.__handlers["sirikata.chat.exit"];
+                        handler(event.name);
+                    }
+                } else if (event.action == "enter") {
+                    if (self.__handlers["sirikata.chat.enter"]) {
+                        var handler = self.__handlers["sirikata.chat.enter"];
+                        handler(event.name);
+                    }
+                }
+            }
         }
 
         // Interface for KIARA
 
-        SirikataProtobuf.prototype.setInitializedCallback = function(callback) {
+        SirikataProtobuf.prototype.setConnectedCallback = function(callback) {
             var self = this;
 
-            if (self.__initialized)
-                callback();
+            if (self.__connected)
+                callback(self.__connectedStatus);
             else
-                self.__initializedCallback = callback;
+                self.__connectedCallback = callback;
+        }
+
+        SirikataProtobuf.prototype.setUserLogin = function(login) {
+            var self = this;
+
+            self.__login = login;
+            self.__initKataJS(self.__url);
         }
 
         SirikataProtobuf.prototype.callMethod = function(callResponse, args) {
             var self = this;
 
-            if (self.__activeCall)
-                throw new KIARA.Error(KIARA.API_ERROR, "SirikataProtobuf doesn't support concurrent calls");
-
-            var call = new PBCallDescriptor(callResponse.getMethodName(), args);
-            call.setResult = function(resultType, result) { callResponse.setResult(result, resultType); }
-            if (call.target == 'server') {
-                self.__sendRequestMessageForCall(call);
-            } else {
-                throw new KIARA.Error(KIARA.API_ERROR, callResponse.getMethodName() + " is a client function. " +
-                    "Cannot invoke it on the server.");
+            if (callResponse.getMethodName() == "sirikata.chat.say") {
+                self.channel.sendMessage(new Kata.ScriptProtocol.ToScript.GUIMessage({
+                    msg: "chat",
+                    event: { msg: args[0] }
+                }));
             }
-
-            if (!call.oneway)
-                self.__activeCall = call;
+//            if (self.__activeCall)
+//                throw new KIARA.Error(KIARA.API_ERROR, "SirikataProtobuf doesn't support concurrent calls");
+//
+//            var call = new PBCallDescriptor(callResponse.getMethodName(), args);
+//            call.setResult = function(resultType, result) { callResponse.setResult(result, resultType); }
+//            if (call.target == 'server') {
+//                self.__sendRequestMessageForCall(call);
+//            } else {
+//                throw new KIARA.Error(KIARA.API_ERROR, callResponse.getMethodName() + " is a client function. " +
+//                    "Cannot invoke it on the server.");
+//            }
+//
+//            if (!call.oneway)
+//                self.__activeCall = call;
         }
 
         SirikataProtobuf.prototype.registerFunc = function(methodDescriptor, nativeMethod) {
             var self = this;
 
-            var call = new PBCallDescriptor(methodDescriptor.methodName);
-            if (call.target == 'client') {
-                self.__handlers[call._requestContainer] = nativeMethod;
-            } else {
-                throw new KIARA.Error(KIARA.API_ERROR, methodDescriptor.methodName + " is a server function. " +
-                    "Cannot register a local handler for it.");
-            }
+            self.__handlers[methodDescriptor.methodName] = nativeMethod;
+
+//            var call = new PBCallDescriptor(methodDescriptor.methodName);
+//            if (call.target == 'client') {
+//                self.__handlers[methodDescriptor.methodName] = nativeMethod;
+//            } else {
+//                throw new KIARA.Error(KIARA.API_ERROR, methodDescriptor.methodName + " is a server function. " +
+//                    "Cannot register a local handler for it.");
+//            }
         }
 
 //        SirikataProtobuf.prototype.__initializeSession = function(callback) {
@@ -965,6 +977,25 @@
 //        }
 
         KIARA.registerProtocol('sirikata-protobuf', SirikataProtobuf);
+    }
+
+    OMP.SirikataChatClient.prototype.__receiveHandler = function(from, message) {
+        var self = this;
+
+        if (self.__onMessage)
+            self.__onMessage(from, message);
+    }
+
+    OMP.SirikataChatClient.prototype.__exitHandler = function(who) {
+        var self = this;
+
+        self.__receiveHandler("System", who + " left");
+    }
+
+    OMP.SirikataChatClient.prototype.__enterHandler = function(who) {
+        var self = this;
+
+        self.__receiveHandler("System", who + " entered");
     }
 
     return OMP;

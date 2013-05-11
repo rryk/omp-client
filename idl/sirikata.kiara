@@ -1,17 +1,9 @@
-namespace * omp;
+namespace * sirikata;
 
-[ProtocolBuffers("../scripts/sirikata/pbj/*.pbj")]
-[WebSocket("ws://yellow.cg.uni-saarland.de:7777/")]
-service sirikata {
-    [PBRequestMessage("Sirikata.Protocol.Session.Container")]
-    [PBTypeMapping("Request.connect : Args[0]")]
-    [PBToServer]
-    [Oneway]
-    void connect(SessionConnect container);
-
-    [PBRequestMessage("Sirikata.Protocol.Session.Container")]
-    [PBResponseMessage("Sirikata.Protocol.Session.Container")]
-    [PBTypeMapping("Request.connect_response : Args[0]; Response.connect_ack : Result")]
-    [PBToClient]
-    void connectResponse(SessionConnectResponse response);
+[SirikataProtobuf]
+service chat {
+    [Oneway] [ToServer] void say(string message);
+    [Oneway] [ToClient] void receive(string from, string message);
+    [Oneway] [ToClient] void enter(string who);
+    [Oneway] [ToClient] void exit(string who);
 }

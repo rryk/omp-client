@@ -1363,6 +1363,10 @@
         return { };
     }
 
+    Connection.prototype.getProtocol = function() {
+        return this._protocol;
+    }
+
     // Constructs a function wrapper that will automatically serialize the method call and send it to the server.
     // The function will return an empty object, which can be used to set up a callback when response is received:
     //

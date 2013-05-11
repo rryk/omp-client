@@ -8,6 +8,7 @@ requirejs.config({
     //the paths config could be for a directory.
     paths: {
         omp: '../omp',
+        katajs: '..'
     },
     shim: {
         'logger': {
@@ -31,7 +32,7 @@ requirejs.config({
                 }
             }
         },
-        'katajs': {
+        'katajs/katajs.compiled': {
             init: function() {
                 var exports = this.Kata;
                 //exports.Protocol = this.Sirikata.Protocol;
@@ -44,8 +45,8 @@ requirejs.config({
     waitSeconds: 60, // wait 1 minute for scripts (maybe slow on mobile network)
 });
 
-requirejs(['omp/omp', 'jquery', 'base64'],
-function(OMP, $, base64) {
+requirejs(['omp/omp', 'jquery', 'base64', 'logger'],
+function(OMP, $, base64, logger) {
     var numLogins = 0;
     var typingUsers = [];
     var log = [];
@@ -99,6 +100,7 @@ function(OMP, $, base64) {
             $("#loginBtn").attr("disabled", "disabled");
     };
     updateLoginInterface();
+    $("#connType").change(updateLoginInterface);
 
     $("#loginBtn").click(function() {
         var connType = $("#connType").val();
@@ -148,8 +150,22 @@ function(OMP, $, base64) {
 
             var client = new OMP.SirikataChatClient(handleSirikataChat);
             client.connect($("#login").val(), $("#pass").val(), function(connected) {
+                /*
+                // DEBUG
+                $("#chatInterface").show();
+                sayHandlers["sirikata"] = function(key, val) {
+                    if (key == 13) {
+                        client.sendMessage(val);
+                        $("#say").val("");
+                    }
+                };
+                $("#say").focus();
+                numLogins++;
+                return;
+                */
+
                 if (!connected)
-                    log.error("Failed to connect to the Sirikata server.");
+                    logger.error("Failed to connect to the Sirikata server.");
                 else {
                     $("#chatInterface").show();
                     sayHandlers["sirikata"] = function(key, val) {
@@ -170,5 +186,4 @@ function(OMP, $, base64) {
         }
     });
     $("#loginBtn").removeAttr("disabled");
-
 });
