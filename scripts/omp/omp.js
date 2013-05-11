@@ -761,7 +761,8 @@
             var self = this;
 
             // Initialize KataJS
-            Kata.scriptRoot = "/projects/omp-client/scripts/";
+            Kata.scriptRoot = location.pathname.substring(0, 
+                location.pathname.lastIndexOf("/")) + "/scripts/";
             var mt = new Kata.MainThread("MyScript.js", "MyScript", {
                 visual: {mesh: ""},
                 space: url,
