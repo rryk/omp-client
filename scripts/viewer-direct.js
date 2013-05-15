@@ -164,8 +164,8 @@
             {x: 0, y: 0, z:1}, // camera at
             AGENT_CONTROL_AT_POS // controls
         );
-        console.log("VIEWER POS XYZ ", position.x, position.y, position.z);
-        console.log("VIEWER ROT XYZW ", rotation.x, rotation.y, rotation.z, rotation.w);
+        //console.log("VIEWER POS XYZ ", position.x, position.y, position.z);
+        //console.log("VIEWER ROT XYZW ", rotation.x, rotation.y, rotation.z, rotation.w);
     }
 
 
@@ -325,12 +325,12 @@
                 xml3dGraphics.rotateCameraLeftAndRight(10 * Math.PI/180);
                 break;
             case XMOT.KEY_D :
-                console.log("press D");
+                //console.log("press D");
                 xml3dGraphics.rotateCameraLeftAndRight(-10 * Math.PI/180);
                 break;
         }
 
-        console.log("SEND PRESS "+this.ompControls);
+        //console.log("SEND PRESS "+this.ompControls);
         this.client.setViewerState(
             xml3dGraphics.getCameraPosition(),
             xml3dGraphics.getCameraRotation(),
@@ -345,20 +345,20 @@
         var changed = true;
         switch (kc) {
             case XMOT.KEY_W :
-                console.log("press W");
+                //console.log("press W");
                 this.ompControls |= AGENT_CONTROL_AT_POS;
                 break;
             case XMOT.KEY_S :
-                console.log("press S");
+                //console.log("press S");
                 this.ompControls |= AGENT_CONTROL_AT_NEG;
                 break;
             case XMOT.KEY_A :
-                console.log("press A");
+                //console.log("press A");
                 xml3dGraphics.rotateCameraLeftAndRight(10 * Math.PI/180);
                 this.ompControls |= AGENT_CONTROL_YAW_POS;
                 break;
             case XMOT.KEY_D :
-                console.log("press D");
+                //console.log("press D");
                 xml3dGraphics.rotateCameraLeftAndRight(-10 * Math.PI/180);
                 this.ompControls |= AGENT_CONTROL_YAW_NEG;
                 break;
@@ -367,7 +367,7 @@
         }
 
         if (changed) {
-            console.log("SEND PRESS "+this.ompControls);
+            //console.log("SEND PRESS "+this.ompControls);
             this.client.setViewerState(
                 xml3dGraphics.getCameraPosition(),
                 xml3dGraphics.getCameraRotation(),
@@ -385,19 +385,19 @@
         var changed = true;
         switch (kc) {
             case XMOT.KEY_W :
-                console.log("release W");
+                //console.log("release W");
                 this.ompControls &= ~AGENT_CONTROL_AT_POS;
                 break;
             case XMOT.KEY_A :
-                console.log("release A");
+                //console.log("release A");
                 this.ompControls &= ~AGENT_CONTROL_YAW_POS;
                 break;
             case XMOT.KEY_S :
-                console.log("release S");
+                //console.log("release S");
                 this.ompControls &= ~AGENT_CONTROL_AT_NEG;
                 break;
             case XMOT.KEY_D :
-                console.log("release D");
+                //console.log("release D");
                 this.ompControls &= ~AGENT_CONTROL_YAW_NEG;
                 break;
             default:
@@ -405,7 +405,7 @@
         }
 
         if (changed) {
-            console.log("SEND RELEASE "+this.ompControls);
+            //console.log("SEND RELEASE "+this.ompControls);
             this.client.setViewerState(
                 xml3dGraphics.getCameraPosition(),
                 xml3dGraphics.getCameraRotation(),
