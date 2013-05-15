@@ -178,6 +178,12 @@
             //    "SCALE Z "+bboxScale.z+" SCALE Z/2 "+(bboxScale.z/2)+" MODEL BBOX SIZE Z "+bboxSize.z+"\n"+
             //    " MODEL BBOX MIN Z "+bbox.min.z+" MODEL BBOX MAX Z "+bbox.max.z);
 
+            // FIXME: Hack for the avatar. Ignores the scale provided by the server and corrects rotation.
+            if (bboxScale.x > 0.73 && bboxScale.x < 0.75) {
+              bboxScale = bboxSize.scale(0.1);
+              this._modelTransform.rotation.setAxisAngle(new XML3DVec3(0, 0, 1), -1);
+            }
+
             this._modelTransform.scale.x = 1 / bboxSize.x;
             this._modelTransform.scale.y = 1 / bboxSize.y;
             this._modelTransform.scale.z = 1 / bboxSize.z;
@@ -200,6 +206,7 @@
                     this._transform.rotation.setQuaternion(
                         new XML3DVec3(bboxRotation.x, bboxRotation.y, bboxRotation.z), bboxRotation.w);
             }
+
             if (bboxScale) {
                 this._transform.scale.x = bboxScale.x;
                 this._transform.scale.y = bboxScale.y;
